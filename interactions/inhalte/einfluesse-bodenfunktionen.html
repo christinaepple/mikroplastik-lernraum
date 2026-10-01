@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Einflüsse auf Bodenfunktionen (Inhalte) - Labor</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inclusive+Sans:wght@300..700&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="/css/interaktion.css">
+
+    <style>
+        :root {
+            --bg-card: #ffffff;
+            --border-card: #e2e8f0;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+
+            --accent-green: #16a34a;
+            --accent-red: #dc2626;
+
+            --font-head: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            --font-text: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            font-family: var(--font-text);
+            font-weight: 400;
+            line-height: 1.5;
+            background-color: var(--bg-card);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ── Kopfleiste ─────────────────────────────────────────────── */
+        .topbar {
+            flex: none;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            padding: 0 28px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-card);
+        }
+
+        .topbar-left,
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .topbar h1 {
+            font-family: var(--font-head);
+            font-size: 1.05rem;
+            font-weight: 600;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 18px;
+            background: #ffffff;
+            border: 1px solid var(--border-card);
+            border-radius: 12px;
+            color: var(--text-main);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .back-btn:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+            transform: translateX(-4px);
+        }
+
+        .cal-btn {
+            padding: 9px 18px;
+            background: #ffffff;
+            border: 1px solid var(--border-card);
+            border-radius: 12px;
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .cal-btn:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 15px;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            background: rgba(220, 38, 38, 0.1);
+            border: 1px solid rgba(220, 38, 38, 0.2);
+            color: var(--accent-red);
+            transition: all 0.3s ease;
+        }
+
+        .status-badge.connected {
+            background: rgba(22, 163, 74, 0.1);
+            border: 1px solid rgba(22, 163, 74, 0.2);
+            color: var(--accent-green);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: currentColor;
+        }
+
+        /* ── Bühne ─────────────────────────────────────────────────────
+           Die Leinwände füllen die Bühne 1:1: ihre Pixel-Auflösung setzt das
+           Skript (`resizeBoard`) auf die tatsächliche Bühnengröße. Die
+           Referenzbilder liegen auf der unteren Ebene (bgCanvas), alles
+           Bewegliche (leere Lücken, gesetzte und getragene Labels, Kringel,
+           Zeiger) auf der oberen (boardCanvas). */
+        .stage {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .bg-canvas,
+        .board-canvas,
+        .intro-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Bühne bleibt unsichtbar, bis die Einführung tatsächlich geht –
+           sonst blitzt sie hinter der anfangs selbst unsichtbaren
+           Einführung auf. Eingeblendet wird sie erst in `dismissIntro`. */
+        .bg-canvas,
+        .board-canvas {
+            transition: opacity 0.5s ease;
+        }
+
+        .bg-canvas.is-waiting,
+        .board-canvas.is-waiting {
+            opacity: 0;
+        }
+
+        /* ── Einführung: schütteln zum starten ─────────────────────────
+           Weißer Grund über der Bühne, wie in den übrigen Modulen. Geht
+           per langem Schütteln, mit Klick als Maus-Fallback ohne Gerät.
+           Bleibt unsichtbar, bis die Kalibrierung den Verbindungszustand
+           geklärt hat. */
+        .intro {
+            position: absolute;
+            inset: 0;
+            z-index: 10;
+            background: var(--bg-card);
+            transition: opacity 0.5s ease;
+        }
+
+        .intro.is-waiting {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .intro.is-gone {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* ── Einführungsspiel: das Halten üben ──────────────────────────
+           Dieselbe Übung wie in den übrigen Stationen: drei graue Löcher,
+           drei Kreise. Liegt über der Box, damit Zeiger und Haltering auch
+           über dem Text zu sehen sind. */
+        .lehre-game,
+        .intro-panel {
+            transition: opacity 0.4s ease;
+        }
+
+        .intro.is-waiting .lehre-game,
+        .intro.is-waiting .intro-panel {
+            opacity: 0;
+        }
+
+        .lehre-game {
+            position: absolute;
+            inset: 0;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .lehre-game.is-gone {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .intro-panel.pre-game {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .lehre-instruction {
+            position: absolute;
+            top: 12%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        /* ── Handy-Grafik (Dreh-Übung) ─────────────────────────────────
+           Aus dem Einführungsspiel „Produktionsabriss" übernommen: ein Gerät,
+           das sich 1:1 mit dem Smartphone dreht. Rechts neben der Linie;
+           gedimmt, solange nicht gedreht werden soll, voll sichtbar während der
+           Dreh-Übung (dieselbe Transparenz wie dort). */
+        .lehre-wheel {
+            position: absolute;
+            bottom: 6%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(150px, 22vh);
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.32;
+            transition: opacity 0.5s ease;
+        }
+
+        .lehre-wheel.is-active {
+            opacity: 1;
+        }
+
+        .wheel-svg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .wheel-track {
+            fill: none;
+            stroke: rgba(15, 23, 42, 0.12);
+            stroke-width: 6;
+        }
+
+        /* Füllt sich von oben im Uhrzeigersinn (per pathLength=100). Der Ring
+           zeigt, wie weit die eine Umdrehung fortgeschritten ist. */
+        .wheel-fill {
+            fill: none;
+            stroke: var(--accent);
+            stroke-width: 6;
+            stroke-linecap: round;
+            stroke-dasharray: 100;
+            stroke-dashoffset: 100;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+            transition: stroke-dashoffset 0.1s linear;
+        }
+
+        .lehre-phone {
+            width: 42%;
+            perspective: 900px;
+        }
+
+        .phone {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1 / 2;
+            transform-style: preserve-3d;
+        }
+
+        .phone-face {
+            position: absolute;
+            inset: 0;
+            border-radius: 14px;
+            background: var(--text-main);
+            border: 3px solid var(--text-main);
+            backface-visibility: hidden;
+        }
+
+        .phone-edge {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 50%;
+            height: 3px;
+            margin-top: -1.5px;
+            background: var(--text-main);
+            border-radius: 2px;
+            transform: rotateX(90deg);
+        }
+
+        .phone-back {
+            transform: rotateX(180deg);
+        }
+
+        .phone-notch,
+        .phone-lens {
+            position: absolute;
+            background: #d9d9d9;
+        }
+
+        .phone-notch {
+            top: 5%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 46%;
+            height: 3.5%;
+            border-radius: 999px;
+        }
+
+        .phone-lens {
+            width: 15%;
+            border-radius: 50%;
+            aspect-ratio: 1;
+        }
+
+        .phone-lens:first-child {
+            bottom: 4%;
+            right: 9%;
+        }
+
+        .phone-lens + .phone-lens {
+            bottom: 12%;
+            right: 20%;
+        }
+    </style>
+</head>
+
+<body>
+    <header class="topbar">
+        <div class="topbar-left">
+            <a href="/inhalte.html" class="back-btn">← Zurück</a>
+            <h1>Einflüsse auf Bodenfunktionen</h1>
+        </div>
+        <div class="topbar-right">
+            <button id="calBtn" class="cal-btn">Mitte kalibrieren</button>
+            <div id="connBadge" class="status-badge">
+                <div class="status-dot"></div>
+                <span id="connStatusText">Offline</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="stage" id="stage">
+        <!-- Untere Ebene: die Referenzbilder (mittig auf einer Linie, leicht
+             gruppiert). Werden einmalig hineingemalt (drawBackground). -->
+        <canvas class="bg-canvas is-waiting" id="bgCanvas" width="3024" height="1964"></canvas>
+
+        <!-- Obere Ebene: leere Lücken, gesetzte/getragene Labels, Kringel und
+             Zeiger. Volle Auflösung, doppelt für scharfe Kanten auf Retina. -->
+        <canvas class="board-canvas is-waiting" id="boardCanvas" width="3024" height="1964"></canvas>
+
+        <!-- Die Kalibrierung hängt sich das Modul js/lib/calibration.js
+             selbst hier herein. -->
+
+        <div class="intro is-waiting" id="intro">
+            <div class="lehre-game" id="lehreGame">
+                <canvas class="intro-canvas" id="introCanvas" width="3024" height="1964"></canvas>
+                <p class="instruction lehre-instruction">kreis aufnehmen und auf der linie ablegen</p>
+                <!-- Handy-Grafik mit Fortschritts-Ring rechts (aus
+                     Produktionsabriss), dreht sich in der Dreh-Übung mit dem
+                     Gerät; der Ring füllt sich über die eine Umdrehung. -->
+                <div class="lehre-wheel" id="lehreWheel">
+                    <svg class="wheel-svg" viewBox="0 0 260 260" aria-hidden="true">
+                        <circle class="wheel-track" cx="130" cy="130" r="118" />
+                        <circle class="wheel-fill" id="lehreWheelFill" cx="130" cy="130" r="118" pathLength="100" />
+                    </svg>
+                    <div class="lehre-phone" id="lehrePhone">
+                        <div class="phone" id="phoneLehre">
+                            <div class="phone-face phone-front">
+                                <span class="phone-notch"></span>
+                            </div>
+                            <div class="phone-edge"></div>
+                            <div class="phone-face phone-back">
+                                <span class="phone-lens"></span>
+                                <span class="phone-lens"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="intro-panel pre-game" id="introBox">
+                <h2>Wie verändert Mikroplastik die Funktionen des Bodens?</h2>
+                <p>Das terrestrische Ökosystem hat viele Funktionen zu leisten. 
+                    Genau hier setzt die Frage an, welche Auswirkungen Mikroplastik auf 
+                    ausgewählte Bodenfunktionen wie die Kohlenstoffspeicherung und die Ernährungssicherung hat.</p>
+                <p>Eingetragenes Mikroplastik verändert die „physikalischen, chemischen und biologischen Eigenschaften des Bodens“&#8239;<cite class="quelle" data-ref="samani-2025" data-loc="S.8">[15]</cite>, etwa pH-Wert, Wasserspeicherung und Nährstoffverfügbarkeit&#8239;<cite class="quelle" data-ref="liu-2025" data-loc="S.2">[16]</cite>. In der Summe kann es „das Pflanzenwachstum,
+                    die Bodengesundheit und die Stabilität des Ökosystems gefährden“&#8239;<cite class="quelle" data-ref="samani-2025" data-loc="S.4">[15]</cite>.</p>
+                <p>Zugleich tragen die Partikel Schadstoffe wie „Schwermetalle und organische Toxine“&#8239;<cite class="quelle" data-ref="samani-2025" data-loc="S.3">[15]</cite>. Zersetzen sie sich, können diese frei werden
+                    und über die Wurzeln in die Pflanzen gelangen&#8239;<cite class="quelle" data-ref="samani-2025" data-loc="S.10">[15]</cite>,
+                    was deren Wachstum verändern kann&#8239;<cite class="quelle" data-ref="rathikannu-2025" data-loc="S.11">[4]</cite>.
+                    So wird die Pflanzengesundheit zum Indikator für den Boden und zur Frage der Ernährungssicherung,
+                    denn kontaminierte Pflanzen gelangen in die Nahrungskette und damit in Tier und Mensch&#8239;<cite class="quelle" data-ref="rathikannu-2025" data-loc="S.11">[4]</cite>.</p>
+                <p class="intro-note instruction">schütteln zum starten</p>
+            </div>
+        </div>
+    </main>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="/js/interactions/inhalte/einfluesse-bodenfunktionen.js"></script>
+    <script type="module" src="/js/interactions/inhalte/quellen-init.js"></script>
+</body>
+
+</html>

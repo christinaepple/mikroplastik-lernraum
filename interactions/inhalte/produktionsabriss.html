@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Produktionsabriss (Inhalte) - Labor</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inclusive+Sans:wght@300..700&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="/css/interaktion.css">
+
+    <style>
+        :root {
+            --bg-card: #ffffff;
+            --border-card: #e2e8f0;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+
+            /* Die Achse füllt sich im Akzent der Ausstellung – dieselbe
+               Farbe, die auch die Anweisungen tragen. Sie kommt aus
+               css/interaktion.css; der eigene Name bleibt, damit sich die
+               Achse bei Bedarf davon lösen lässt, ohne alles umzubenennen. */
+            --progress: var(--accent);
+
+            /* Das weiche Grau des Übungsspiels – der Hof um den Zeiger in den
+               Eintragspfaden. */
+            --soft: rgba(15, 23, 42, 0.12);
+            --accent-green: #16a34a;
+            --accent-red: #dc2626;
+
+            /* Eine Schrift für alles: Inclusive Sans ist auf Lesbarkeit hin
+               gezeichnet – offene Punzen, deutlich unterscheidbares I/l/1.
+               Überschrift und Fließtext trennt allein das Gewicht, 600
+               gegen 400. Dieselbe Paarung wie in den übrigen
+               Inhalts-Stationen. */
+            --font-head: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            --font-text: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        /* Das Modul füllt das Fenster; ein begrenzender Rand um die Fläche
+           kostet nur Platz – dieselbe Entscheidung wie bei den übrigen
+           Inhalts-Stationen. */
+        body {
+            font-family: var(--font-text);
+            font-weight: 400;
+            line-height: 1.5;
+            background-color: var(--bg-card);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ── Kopfleiste ─────────────────────────────────────────────── */
+        /* Feste Höhe statt einer, die sich aus dem Inhalt ergibt: Nur so ist
+           die Fläche, die dem Zeitstrahl bleibt, im Voraus bekannt. */
+        .topbar {
+            flex: none;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            padding: 0 28px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-card);
+        }
+
+        .topbar-left,
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .topbar h1 {
+            font-family: var(--font-head);
+            font-size: 1.05rem;
+            font-weight: 600;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 18px;
+            background: #ffffff;
+            border: 1px solid var(--border-card);
+            border-radius: 12px;
+            color: var(--text-main);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .back-btn:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+            transform: translateX(-4px);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 15px;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            background: rgba(220, 38, 38, 0.1);
+            border: 1px solid rgba(220, 38, 38, 0.2);
+            color: var(--accent-red);
+            transition: all 0.3s ease;
+        }
+
+        .status-badge.ready {
+            background: rgba(217, 119, 6, 0.1);
+            border: 1px solid rgba(217, 119, 6, 0.2);
+            color: #d97706;
+        }
+
+        .status-badge.connected {
+            background: rgba(22, 163, 74, 0.1);
+            border: 1px solid rgba(22, 163, 74, 0.2);
+            color: var(--accent-green);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: currentColor;
+        }
+
+        /* ── Bühne ─────────────────────────────────────────────────── */
+        /* Zwei Spalten: links das Diagramm mit der Frage darunter, rechts die
+           Kennzahl. Das Diagramm beginnt direkt unter der Kopfleiste, und die
+           Höhe, die die Frage vorher oben belegt hat, kommt den Haufen zugute:
+           Sie bekommen ihre Breite aus ihrer Höhe. */
+        .stage {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            align-items: stretch;
+            justify-content: center;
+            gap: 48px;
+            padding: 2.5vh 28px 4vh;
+            overflow: hidden;
+            /* Breite des Diagramms – die Frage darunter nimmt dieselbe, damit
+               beide links an derselben Kante beginnen. */
+            --diagram-w: min(1000px, 100%);
+            /* Gesteuert wird mit dem Smartphone; ein Mauszeiger, der irgendwo
+               in der Fläche stehen bleibt, ist hier nur ein vergessener
+               Gegenstand. Nur über der Bühne – in der Kopfleiste wird
+               geklickt. */
+            cursor: none;
+        }
+
+        /* Die linke Spalte: Diagramm und Frage gehören zusammen und teilen
+           sich deshalb eine Spalte – nur so beginnt die Frage an derselben
+           Kante wie die Achse, egal wie breit die Kennzahl rechts ausfällt. */
+        .diagram-col {
+            flex: 1;
+            min-width: 0;
+            max-width: var(--diagram-w);
+            display: flex;
+            flex-direction: column;
+            gap: 3vh;
+            transition: opacity 0.6s ease;
+        }
+
+
+        /* Die Frage steht unter dem Diagramm und gehört zu ihm: dieselbe
+           Schrift und Größe wie die Fragen der übrigen Stationen. */
+        .timeline-desc {
+            font-family: var(--font-head);
+            font-size: 1.7rem;
+            font-weight: 600;
+            line-height: 1.3;
+            /* Bricht die Zeile, falls sie umbricht, in gleich lange Hälften
+               statt in eine volle und einen Rest. */
+            text-wrap: balance;
+        }
+
+        /* Was das Diagramm misst, steht unter der Frage – in der Textschrift
+           und gedämpft: eine Angabe zur Achse, keine zweite Überschrift. */
+        .timeline-unit {
+            display: block;
+            margin-top: 10px;
+            font-family: var(--font-text);
+            font-size: 1.05rem;
+            line-height: 1.5;
+            color: var(--text-muted);
+        }
+
+        /* ── Kennzahl neben dem Diagramm ───────────────────────────────
+           Erscheint mit dem letzten Balken: Sie fasst zusammen, was die drei
+           Haufen zeigen, und steht deshalb erst da, wenn alle drei stehen.
+           Der Platz ist von Anfang an reserviert – käme die Spalte erst beim
+           Erscheinen dazu, spränge das Diagramm in diesem Moment zur Seite.
+           Oben bündig mit der Balkenfläche. */
+        /* Die rechte Spalte hält den Platz. Was darin steht, wechselt: erst die
+           Wachstumsrate, später die Jahreszahl der Verweildauer. Beide liegen
+           übereinander an derselben Stelle, damit die Zahl beim Wechsel nicht
+           springt – die Reihe bekommt so einen festen Ort für ihre Kennzahl. */
+        .side {
+            flex: none;
+            transition: opacity 0.6s ease;
+            align-self: flex-start;
+            width: min(280px, 26vw);
+            display: flex;
+            flex-direction: column;
+            gap: 4vh;
+        }
+
+        /* Alle drei Zahlen sind gleich gebaut und stehen untereinander. Ihr
+           Platz ist von Anfang an reserviert – sie werden nur eingeblendet,
+           nicht eingefügt, sonst rutschte die Reihe bei jeder neuen Zahl. */
+        .figure {
+            opacity: 0;
+            transform: translateY(-8px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        .figure.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Etwas kleiner als früher die eine Kennzahl: Zu dritt untereinander
+           brauchen sie Platz, und die oberste soll nicht die Bühne der beiden
+           anderen sein.
+           Die Obergrenze richtet sich nach der längsten Zeile, „2.646 Mio t“:
+           Sie misst in dieser Schrift gut fünfeinhalb Geviert, passt bei 3 rem
+           also gerade in die 280 px breite Spalte. Der Umbruch ist zusätzlich
+           abgestellt – die Einheit gehört zur Zahl und darf nicht allein in
+           der nächsten Zeile landen. */
+        .figure-value {
+            font-family: var(--font-head);
+            font-size: clamp(1.9rem, 5vh, 3rem);
+            font-weight: 600;
+            line-height: 1;
+            color: var(--text-main);
+            white-space: nowrap;
+        }
+
+        .figure-label {
+            margin-top: 12px;
+            font-size: 1.05rem;
+            line-height: 1.5;
+            color: var(--text-muted);
+        }
+
+        /* ── Spielerei ─────────────────────────────────────────────────
+           Wer nach der Kennzahl weiterdreht, sprenkelt den Bildschirm mit
+           Objekten zu – dieselben drei Zeichnungen, aus denen die Haufen im
+           Diagramm bestehen. Was dort als Menge abstrakt bleibt, liegt hier
+           plötzlich überall herum.
+           Die Objekte liegen über dem Diagramm, aber unter der Einführung, und
+           nehmen keine Klicks an: Sie sind Zutat, kein Bedienelement. */
+        .sprinkles {
+            position: absolute;
+            inset: 0;
+            z-index: 15;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        /* Die Objekte gehören über das Diagramm, nicht über die Kennzahl – die
+           soll lesbar bleiben. Statt die Fläche hart abzuschneiden, läuft sie
+           vor der rechten Spalte aus: ein Rand, den man nicht als Kante sieht.
+           Wo genau, misst das Skript und legt es in den beiden Variablen ab –
+           die Spalten sind zentriert, ihre Position steht also nicht fest.
+           Die Ersatzwerte greifen nur, falls die Messung ausfällt. */
+        .sprinkles {
+            -webkit-mask-image: linear-gradient(to right,
+                    #000 0,
+                    #000 var(--sprinkle-solid, 62%),
+                    transparent var(--sprinkle-clear, 76%));
+            mask-image: linear-gradient(to right,
+                    #000 0,
+                    #000 var(--sprinkle-solid, 62%),
+                    transparent var(--sprinkle-clear, 76%));
+        }
+
+        /* Die Drehung steckt in einer eigenen Variable, damit das Einblenden
+           sie nicht überschreibt: Beides sind Transformationen und stünden
+           sonst in derselben Eigenschaft gegeneinander. */
+        .sprinkle {
+            position: absolute;
+            opacity: 0;
+            transform: translate(-50%, -50%) rotate(var(--tilt)) scale(0.4);
+            transition: opacity 0.35s ease,
+                transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .sprinkle.visible {
+            opacity: 1;
+            transform: translate(-50%, -50%) rotate(var(--tilt)) scale(1);
+        }
+
+        /* ── Diagramm ──────────────────────────────────────────────── */
+        /* Das Diagramm nimmt die ganze Fläche unter der Frage ein, statt in
+           ihrer Mitte zu stehen: Die Haufen sind sehr hochformatig gezeichnet
+           und bekommen ihre Breite aus ihrer Höhe (der größte ist nur ein
+           Sechstel so breit wie hoch). Jede Höhe, die hier verschenkt wird,
+           macht sie zugleich schmaler. */
+        .timeline-container {
+            flex: 1;
+            min-height: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            /* Kein Abstand: Die Haufen sollen auf der Achse aufsitzen, nicht
+               über ihr schweben. Den Abstand zu den Jahreszahlen darunter hält
+               die .labels-container mit ihrem eigenen margin. */
+            gap: 0;
+        }
+
+        /* Die Balkenfläche ist, was nach Achse und Jahreszahlen übrig bleibt –
+           keine feste Höhe mehr.
+           Die Balken stehen nicht mehr in gleichen Dritteln, sondern dort, wo
+           ihr Jahr auf der Achse liegt: Sie ist eine Zeitachse, keine Reihe
+           von drei Fächern. Die Position setzt das Skript aus den Jahreszahlen
+           (siehe BAR_YEARS) – deshalb hier nur die Verankerung. */
+        .bars-container {
+            flex: 1;
+            min-height: 0;
+            position: relative;
+        }
+
+        .bar-section {
+            position: absolute;
+            bottom: 0;
+            /* left kommt vom Skript */
+            transform: translateX(-50%);
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
+        /* ── Balken ────────────────────────────────────────────────────
+           Die Balken sind Bilder: Haufen aus Plastikobjekten, keine Flächen.
+           Deshalb steht dahinter nichts mehr – keine Farbe, kein Radius, kein
+           Schatten, die als Rechteck hinter den Umrissen läge.
+           Aufgedeckt wird über `clip-path` statt über `scaleY`: Ein gestauchtes
+           Rechteck war nur ein flacheres Rechteck, eine gestauchte Zeichnung
+           wäre verzogen. Der Balken wächst also nicht, er wird von unten nach
+           oben freigelegt.
+           Der Balken ist dabei dieselbe Kiste wie vorher – ein `div` mit
+           Prozenthöhe –, nur dass ihn statt einer Farbe die Zeichnung füllt.
+           Als `<img>` ging es nicht: Ein Bild bringt seine Dateimaße mit, und
+           die haben entweder die Breite des Containers bestimmt (537 bis
+           663 px statt der schmalen skalierten Breite) oder die Höhe. Hier
+           gibt das `aspect-ratio` die Breite aus der Höhe vor, und
+           `background-size: 100% 100%` legt die Zeichnung in genau diese
+           Kiste – ohne sie zu verzerren, weil beide dasselbe Verhältnis
+           haben. */
+        .bar {
+            position: relative;
+            width: auto;
+            aspect-ratio: var(--bar-ratio);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        /* Die Zeichnung liegt in einem eigenen Element, nicht im Balken selbst:
+           Der `clip-path`, der sie von unten aufdeckt, würde sonst auch die
+           Zahl darin abschneiden. */
+        .bar::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: var(--bar-img);
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+            clip-path: inset(100% 0 0 0);
+            transition: clip-path 0.6s cubic-bezier(0.33, 1, 0.68, 1);
+        }
+
+        .bar.visible {
+            opacity: 1;
+        }
+
+        .bar.visible::before {
+            clip-path: inset(0 0 0 0);
+        }
+
+        /* Die Menge steht im Balken, um 90 Grad gedreht: Aufrecht wäre sie im
+           schmalsten Balken breiter als er selbst.
+           Alle drei sitzen gleich hoch über der Achse, nicht mittig in ihrem
+           Balken – so stehen sie in einer Zeile und lassen sich lesen wie eine
+           Beschriftung, statt mit der Balkenhöhe nach oben zu wandern. Der
+           Abstand ist deshalb am unteren Rand gemessen.
+           Gesetzt über die Schreibrichtung statt über eine Drehung: Ein
+           gedrehtes Element behält den Platzbedarf seiner ungedrehten Form,
+           die Zahl ließe sich dann nicht sauber am Fuß des Balkens ausrichten.
+           Der weiße Schein trägt sie über die Zeichnung – die Objekte darunter
+           sind mal gelb, mal blau, mal rot, eine feste Schriftfarbe säße also
+           immer irgendwo schlecht. */
+        .bar-value {
+            position: absolute;
+            left: 50%;
+            bottom: 2.5vh;
+            writing-mode: vertical-rl;
+            transform: translateX(-50%) rotate(180deg);
+            font-family: var(--font-head);
+            font-size: 1.3rem;
+            font-weight: 600;
+            line-height: 1;
+            color: var(--text-main);
+            white-space: nowrap;
+            text-shadow: 0 0 8px #fff, 0 0 8px #fff, 0 0 4px #fff, 0 0 4px #fff;
+        }
+
+        /* Die Höhen stehen im Verhältnis der Mengen, die sie zeigen:
+           1976 = 50, 2002 = 200, 2024 = 430,9 Mio t weltweite Kunststoff-
+           produktion. Der größte füllt die Fläche ganz aus, die beiden
+           anderen hängen an ihm – 50/430,9 und 200/430,9.
+           Die Prozentwerte sind um den durchsichtigen Rand der Dateien
+           korrigiert: Die Höhe gilt dem Bild, gemeint ist aber das Motiv
+           darin, und das füllt die Dateien zu 99,7 / 99,4 / 99,4 %.
+
+           Maßregel für die Zeichnungen, falls eine neu entsteht: Ein Haufen für
+           X Mio t ist X × 9,75 px hoch (der Maßstab kommt von balken3). Nur
+           dann sind die Objekte in allen drei Haufen gleich groß – und nur die
+           Motivhöhe entscheidet darüber, die Dateigröße nicht: Ein größer
+           gerechnetes Bild bringt größere Objekte mit und ändert nichts. */
+        .small-bar {
+            /* 1976: 50 / 430,9 Mio t */
+            height: 11.68%;
+            --bar-ratio: 555 / 475;
+            --bar-img: url('/img/interactionen/produktionsabriss/balken1.png');
+        }
+
+        .middle-bar {
+            /* 2002: 200 / 430,9 Mio t */
+            height: 46.30%;
+            --bar-ratio: 588 / 1735;
+            --bar-img: url('/img/interactionen/produktionsabriss/balken2.png');
+        }
+
+        .large-bar {
+            /* 2024: 430,9 Mio t */
+            height: 100%;
+            --bar-ratio: 663 / 4228;
+            --bar-img: url('/img/interactionen/produktionsabriss/balken3.png');
+        }
+
+        /* ── Achse ─────────────────────────────────────────────────── */
+        .timeline-axis-wrap {
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+
+        /* Die Achse ist eine Zeitachse: Ihre ganze Länge sind die Jahre 1950
+           bis 2040, gleichmäßig aufgeteilt. Balken, Jahreszahlen und Füllung
+           beziehen sich alle auf dieselbe Skala und können deshalb gar nicht
+           auseinanderlaufen.
+           Dafür darf sich nichts anderes die Zeile mit ihr teilen; „Zeit"
+           hängt deshalb unter dem Ende der Achse statt daneben zu stehen. */
+        .timeline-axis {
+            flex: 1;
+            height: 6px;
+            background: #cbd5e1;
+            position: relative;
+            border-radius: 3px;
+        }
+
+        /* Wie weit gedreht wurde, steht in der Achse selbst – sie ist zugleich
+           Zeitachse und Fortschritt. Weil beide dieselbe Skala haben, ist die
+           Füllung schlicht der Drehwinkel: Eine volle Umdrehung sind die
+           neunzig Jahre von 1950 bis 2040, und die Kante der Füllung steht
+           immer genau auf dem Jahr, das gerade erreicht ist. */
+        .timeline-fill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 0%;
+            background: var(--progress);
+            border-radius: 3px;
+            transition: width 0.1s linear;
+        }
+
+        .timeline-arrow {
+            position: absolute;
+            right: -2px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 0;
+            height: 0;
+            border-top: 11px solid transparent;
+            border-bottom: 11px solid transparent;
+            border-left: 16px solid var(--progress);
+        }
+
+        /* Die Zeile unter der Achse. Jede Jahreszahl steht dort, wo ihr Jahr
+           auf der Achse liegt – dieselbe Position wie der Balken darüber, aus
+           derselben Rechnung. Alles darin ist absolut gesetzt, die Zeile
+           braucht ihre Höhe deshalb selbst. */
+        .labels-container {
+            position: relative;
+            width: 100%;
+            height: 1.5rem;
+            margin-top: 10px;
+        }
+
+        .label-section {
+            position: absolute;
+            top: 0;
+            /* left kommt vom Skript */
+            transform: translateX(-50%);
+        }
+
+        /* Wo die Achse beginnt: 1950 ist der Anfang der Zeitrechnung dieser
+           Station, hat aber keinen Balken – 1,7 Mio t wären hier zwanzig
+           Pixel. Deshalb gedämpft und ohne Raster, es ist eine Angabe zur
+           Achse und keine vierte Messung.
+           Linksbündig statt auf dem Nullpunkt zentriert, damit die Zahl nicht
+           halb aus dem Diagramm ragt. */
+        .axis-start-label,
+        .timeline-label {
+            position: absolute;
+            top: 0;
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .axis-start-label {
+            left: 0;
+        }
+
+        /* Der Name der Achse, am Ende der Linie – auf derselben Höhe wie die
+           Jahreszahlen. */
+        .timeline-label {
+            right: 0;
+        }
+
+        /* Jahreszahlen als handgeschriebene Bilder statt Systemschrift:
+           feste Höhe an der Zeilenhöhe der übrigen Achsen-Beschriftung
+           ausgerichtet, die Breite folgt im festen Seitenverhältnis der
+           Dateien (160×73) automatisch mit. */
+        .axis-start-label,
+        .year-label {
+            display: block;
+            height: 1.3rem;
+            width: auto;
+        }
+
+        /* Die Jahreszahl kommt mit ihrem Balken und geht mit ihm. */
+        .year-label {
+            opacity: 0;
+            transform: translateY(-5px);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+
+        .year-label.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ── Einführungsspiel ──────────────────────────────────────────
+           Vor allem Inhaltlichen steht die Bewegung: Wer hier durch ist, hat
+           die Geste in der Hand, bevor die erste Zahl zu sehen war. Dieselbe
+           Dramaturgie wie in den Eintragspfaden, nur dass dort ein Zeiger der
+           Neigung folgt und hier ein Telefon der Drehung.
+           Das Telefon in der Mitte ist die eigentliche Erklärung: Es dreht
+           sich eins zu eins mit dem Gerät in der Hand. Keine Zeichnung einer
+           Bewegung, sondern die Bewegung selbst – wer das Gerät falsch dreht,
+           sieht sofort, dass sich nichts tut. */
+        .tutorial {
+            position: absolute;
+            inset: 0;
+            z-index: 30;
+            background: var(--bg-card);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4vh;
+            padding: 4vh 28px;
+            transition: opacity 0.6s ease;
+        }
+
+        /* Jede Schicht wartet, bis sie an der Reihe ist – erst der
+           Verbindungscheck, dann die Übung, dann der Text.
+           Der Grund: Alles außer dem Verbindungscheck steht im Markup und wäre
+           sonst schon im ersten Bild da. Sich gegenseitig zu verdecken reicht
+           nicht, denn wer verdeckt, kommt selbst erst später dazu – in der
+           Lücke blitzt dann die Schicht darunter durch. */
+        .diagram-col.is-waiting,
+        .side.is-waiting,
+        .tutorial.is-waiting,
+        .intro.is-waiting {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .tutorial.is-gone {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Beide Schritte stehen nebeneinander, von Anfang an sichtbar: Man
+           sieht, was kommt, und wie viel noch fehlt – das sagt mehr als die
+           Zeile „Schritt 1 von 2“, die man erst lesen müsste.
+           Der jeweils andere tritt zurück, statt zu verschwinden: Das Paar
+           bleibt als Paar erkennbar. */
+        .tutorial-steps {
+            display: flex;
+            align-items: flex-start;
+            gap: min(6vw, 70px);
+        }
+
+        .tutorial-wheel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 18px;
+            opacity: 0.32;
+            transition: opacity 0.5s ease;
+        }
+
+        .tutorial-wheel.is-active,
+        .tutorial-wheel.is-done {
+            opacity: 1;
+        }
+
+        /* Oben statt unter dem Rad – dieselbe Höhe wie der Anweisungstext in
+           den übrigen Einführungsspielen (`top: 12%`). Absolut statt im Fluss
+           der Spalte, damit die Höhe von der Größe des Rads unabhängig
+           bleibt; die Bezugsfläche ist `.tutorial`, deren einziger
+           positionierter Vorfahre.
+           Die Mitte jeder Spalte lässt sich nicht mit `left: 50%` treffen –
+           zwei Räder teilen sich die Bühne –, deshalb dieselbe Rechnung wie
+           `.tutorial-steps`/`.wheel-face`: halber Abstand plus halbe
+           Radbreite, von der Bühnenmitte aus nach links bzw. rechts. */
+        .wheel-move {
+            position: absolute;
+            top: 12%;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        #wheelOne .wheel-move {
+            left: calc(50% - (min(6vw, 70px) / 2 + min(260px, 34vh) / 2));
+            transform: translateX(-50%);
+        }
+
+        #wheelTwo .wheel-move {
+            left: calc(50% + (min(6vw, 70px) / 2 + min(260px, 34vh) / 2));
+            transform: translateX(-50%);
+        }
+
+        .wheel-face {
+            position: relative;
+            width: min(260px, 34vh);
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Über der Abbildung steht, was der Schritt tut, darunter wie man ihn
+           ausführt. Kleingeschrieben wie die Anweisung, aber in Textfarbe: Sie
+           benennt den Schritt, sie fordert nicht auf. */
+        .wheel-label {
+            font-size: 1rem;
+            color: var(--text-muted);
+            text-transform: lowercase;
+        }
+
+        .tutorial-wheel.is-active .wheel-label {
+            color: var(--text-main);
+        }
+
+        .wheel-face svg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .wheel-track {
+            fill: none;
+            stroke: var(--soft);
+            stroke-width: 6;
+        }
+
+        /* Der Ring füllt sich von oben im Uhrzeigersinn – gedreht, weil ein
+           Kreis in SVG rechts beginnt. */
+        /* `pathLength="100"` im Markup macht den Umfang zu hundert Einheiten,
+           egal wie groß der Kreis ist. Damit steht der leere Anfangszustand
+           schon hier – vor jedem Skript. Vorher setzte ihn erst das Skript,
+           und bis dahin war der Kreis durchgezogen: Man sah ihn beim Laden
+           kurz leerlaufen. */
+        .wheel-fill {
+            fill: none;
+            stroke: var(--accent);
+            stroke-width: 6;
+            stroke-linecap: round;
+            stroke-dasharray: 100;
+            stroke-dashoffset: 100;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+            transition: stroke-dashoffset 0.1s linear;
+        }
+
+        /* Der Rückweg läuft andersherum: Die Spiegelung dreht den Umlaufsinn
+           um, ohne die Rechnung dahinter anzufassen. Der Ring füllt sich damit
+           in dieselbe Richtung, in die das Gerät gedreht wird.
+           Gespiegelt wird an der Waagerechten, nicht an der Senkrechten: Der
+           Anfang des Kreises liegt vor der Drehung auf drei Uhr, und nur
+           `scaleY` lässt ihn dort – bei `scaleX` wanderte er auf neun und nach
+           der Drehung auf sechs Uhr. Beide Ringe starten so oben. */
+        .wheel-fill.is-reverse {
+            transform: rotate(-90deg) scaleY(-1);
+        }
+
+        /* Die Bühne für das Telefon: Ohne Perspektive bliebe die Drehung um
+           die Querachse eine Zeichnung, die schmaler wird – mit ihr kippt das
+           Gerät sichtbar nach vorn, so wie es in der Hand liegt. */
+        .phone-stage {
+            perspective: 900px;
+            width: 42%;
+        }
+
+        /* Das Telefon ist keine Fläche, sondern hat zwei Seiten: Vorderseite
+           und Rückseite liegen deckungsgleich übereinander, die hintere um
+           180° vorgedreht. Weil beide ihre Rückansicht verbergen, sieht man
+           immer genau die, die einen gerade anschaut – die Vorderseite bis zur
+           Vierteldrehung, danach die Rückseite. Damit dreht sich hier ein
+           Gegenstand und nicht ein Bild von einem.
+           Gedreht wird um die Querachse (`rotateX`), deshalb steht auch die
+           Rückseite auf `rotateX(180deg)`: Auf der anderen Achse vorgedreht
+           stünde sie später auf dem Kopf. */
+        .phone {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1 / 2;
+            /* Ohne Übergang: Die Drehung kommt vom Sensor und ist schon
+               flüssig; eine Verzögerung machte daraus ein Nachziehen. */
+            transform-style: preserve-3d;
+        }
+
+        .phone-face {
+            position: absolute;
+            inset: 0;
+            border-radius: 14px;
+            background: var(--text-main);
+            border: 3px solid var(--text-main);
+            backface-visibility: hidden;
+        }
+
+        /* Die schmale Kante. Ohne sie verschwindet das Gerät bei jeder
+           Vierteldrehung: Die beiden Seiten sind selbst ohne Dicke, quer
+           gestellt bleibt von ihnen nichts übrig.
+           Der Streifen liegt waagerecht in der Mitte und ist um 90° gekippt,
+           steht also senkrecht auf den Flächen. Zeigt das Gerät auf den
+           Betrachter, steht er selbst quer und ist unsichtbar; steht das Gerät
+           quer, schaut er den Betrachter an – dann sieht man ihn als Linie in
+           voller Breite. Genau umgekehrt zu den Flächen also, und deshalb
+           immer genau eines von beidem sichtbar. */
+        .phone-edge {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 50%;
+            height: 3px;
+            margin-top: -1.5px;
+            background: var(--text-main);
+            border-radius: 2px;
+            transform: rotateX(90deg);
+        }
+
+        .phone-back {
+            transform: rotateX(180deg);
+        }
+
+        .phone-notch,
+        .phone-lens {
+            position: absolute;
+            background: #d9d9d9;
+        }
+
+        .phone-notch {
+            top: 5%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 46%;
+            height: 3.5%;
+            border-radius: 999px;
+        }
+
+        /* Versetzt übereinander, wie bei einer Doppelkamera – gleich groß, nur
+           die Lage unterscheidet sie. */
+        .phone-lens {
+            width: 15%;
+            border-radius: 50%;
+            aspect-ratio: 1;
+        }
+
+        /* Unten rechts, nicht oben links: Die Rückseite ist um die Querachse
+           vorgedreht, das Gerät steht darin also auf dem Kopf. Was in der Hand
+           die obere linke Ecke der Rückseite ist, zeigt sich nach der halben
+           Drehung unten rechts. Entsprechend kippt auch der Versatz der
+           zweiten Linse mit. */
+        .phone-lens:first-child {
+            bottom: 4%;
+            right: 9%;
+        }
+
+        .phone-lens + .phone-lens {
+            bottom: 12%;
+            right: 20%;
+        }
+
+        .phone::before {
+            left: -13%;
+        }
+
+        .phone::after {
+            right: -13%;
+        }
+
+        .tutorial-hint {
+            margin-top: 10px;
+            font-size: 1rem;
+            color: var(--text-muted);
+        }
+
+        /* ── Einführung ────────────────────────────────────────────────
+           Die Aufgabe steht vor der Station, nicht daneben: Sie ist einmal zu
+           lesen und dann aus dem Weg – ein Text, den Schütteln beendet.
+           Die weiße Textbox selbst ist überall dieselbe; ihre Form steht in
+           css/interaktion.css (.intro-panel). */
+        /* Deckend, nicht durchscheinend: Solange der Text dasteht, gibt es
+           nichts anderes zu sehen. Das Diagramm dahinter ist zu diesem
+           Zeitpunkt ohnehin leer – zu ahnen wäre nur die Achse, und die lenkt
+           beim Lesen ab. Ein Weichzeichner erübrigt sich damit. */
+        .intro {
+            position: absolute;
+            inset: 0;
+            z-index: 20;
+            background: var(--bg-card);
+            transition: opacity 0.5s ease;
+        }
+
+        .intro.is-gone {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+    </style>
+</head>
+
+<body>
+    <header class="topbar">
+        <div class="topbar-left">
+            <a href="/inhalte.html" class="back-btn">← Zurück</a>
+            <h1>Produktionsabriss</h1>
+        </div>
+        <div class="topbar-right">
+            <div id="connBadge" class="status-badge">
+                <div class="status-dot"></div>
+                <span id="connStatusText">Offline</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Bühne: links der Zeitstrahl mit der Frage darunter, rechts die
+         Kennzahl, die mit dem letzten Balken erscheint -->
+    <main class="stage" id="stage">
+        <div class="diagram-col is-waiting">
+            <div class="timeline-container">
+                <!-- Die Balken stehen dort, wo ihr Jahr auf der Achse liegt;
+                     die Position setzt das Skript aus BAR_YEARS. -->
+                <div class="bars-container">
+                    <div class="bar-section">
+                        <div id="barLeft" class="bar small-bar">
+                            <span class="bar-value"></span>
+                        </div>
+                    </div>
+
+                    <div class="bar-section">
+                        <div id="barMiddle" class="bar middle-bar">
+                            <span class="bar-value"></span>
+                        </div>
+                    </div>
+
+                    <div class="bar-section">
+                        <div id="barRight" class="bar large-bar">
+                            <span class="bar-value"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Achse mit Fortschritt. Nichts teilt sich die Zeile mit ihr,
+                     damit die Linie genauso breit ist wie das Balkenraster
+                     darüber. -->
+                <div class="timeline-axis-wrap">
+                    <div class="timeline-axis">
+                        <div id="timelineFill" class="timeline-fill"></div>
+                        <div class="timeline-arrow"></div>
+                    </div>
+                </div>
+
+                <!-- Beschriftung der Achse: ihr Anfang, die drei Jahreszahlen
+                     unter ihren Balken, ihr Name am Ende. Position und Text
+                     der Jahreszahlen kommen aus BAR_YEARS im Skript; was hier
+                     steht, ist nur der Stand vor dem ersten Lauf. -->
+                <div class="labels-container">
+                    <img class="axis-start-label" src="/img/interactionen/produktionsabriss/1950.png" alt="1950">
+
+                    <div class="label-section">
+                        <img id="labelLeft" class="year-label" src="/img/interactionen/produktionsabriss/1976.png" alt="1976">
+                    </div>
+                    <div class="label-section">
+                        <img id="labelMiddle" class="year-label" src="/img/interactionen/produktionsabriss/2002.png" alt="2002">
+                    </div>
+                    <div class="label-section">
+                        <img id="labelRight" class="year-label" src="/img/interactionen/produktionsabriss/2024.png" alt="2024">
+                    </div>
+
+                    <span class="timeline-label">Zeit</span>
+                </div>
+            </div>
+
+            <!-- Die Frage steht unter dem Diagramm, wie eine Bildunterschrift,
+                 darunter die Angabe, was gemessen wird -->
+            <div class="timeline-desc">
+                Wie viel Kunststoff wurde im Laufe der Jahre produziert?
+                <span class="timeline-unit">weltweite Kunststoffproduktion in Millionen Tonnen&#8239;<cite class="quelle" data-ref="statista-2024" data-loc="">[3]</cite></span>
+            </div>
+
+        </div>
+
+        <!-- Rechte Spalte: die Zahlen kommen nacheinander dazu und bleiben
+             stehen – Wachstum, Blick nach vorn, Verweildauer. Werte und Jahre
+             setzt das Skript, damit sie zu den Balken passen. -->
+        <aside class="side is-waiting">
+            <div class="figure" id="growth">
+                <div class="figure-value" id="growthRate">8,6&nbsp;%</div>
+                <div class="figure-label">durchschnittlicher jährlicher Produktionsanstieg</div>
+            </div>
+
+            <!-- Fortschreibung, keine Prognose: dieselbe Wachstumsrate weiter
+                 gerechnet. Die Zahl rechnet das Skript aus dem letzten Balken. -->
+            <div class="figure" id="current">
+                <div class="figure-value" id="futureValue">2.646 Mio t</div>
+                <div class="figure-label">
+                    wären es im Jahr <span id="futureYear">2046</span>, wenn es in diesem Tempo
+                    weitergeht
+                </div>
+            </div>
+        </aside>
+
+        <!-- Die Spielerei: füllt sich beim Weiterdrehen mit Objekten, die das
+             Skript verteilt -->
+        <div class="sprinkles" id="sprinkles"></div>
+
+        <!-- Das Einführungsspiel liegt über allem, auch über der Einführung:
+             Geübt wird, bevor es etwas zu lesen gibt. -->
+        <div class="tutorial is-waiting" id="tutorial">
+            <div class="tutorial-steps">
+                <div class="tutorial-wheel is-active" id="wheelOne">
+                    <div class="wheel-face">
+                        <svg viewBox="0 0 260 260" aria-hidden="true">
+                            <circle class="wheel-track" cx="130" cy="130" r="118" />
+                            <circle class="wheel-fill" id="wheelFillOne" cx="130" cy="130" r="118" pathLength="100" />
+                        </svg>
+
+                        <div class="phone-stage">
+                            <div class="phone" id="phoneOne">
+                                <div class="phone-face phone-front">
+                                    <span class="phone-notch"></span>
+                                </div>
+                                <div class="phone-edge"></div>
+                                <div class="phone-face phone-back">
+                                    <span class="phone-lens"></span>
+                                    <span class="phone-lens"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="wheel-label">Zeit weiterdrehen</div>
+                    <div class="wheel-move instruction">drehe von dir weg</div>
+                </div>
+
+                <div class="tutorial-wheel" id="wheelTwo">
+                    <div class="wheel-face">
+                        <svg viewBox="0 0 260 260" aria-hidden="true">
+                            <circle class="wheel-track" cx="130" cy="130" r="118" />
+                            <circle class="wheel-fill is-reverse" id="wheelFillTwo" cx="130" cy="130" r="118" pathLength="100" />
+                        </svg>
+
+                        <div class="phone-stage">
+                            <div class="phone" id="phoneTwo">
+                                <div class="phone-face phone-front">
+                                    <span class="phone-notch"></span>
+                                </div>
+                                <div class="phone-edge"></div>
+                                <div class="phone-face phone-back">
+                                    <span class="phone-lens"></span>
+                                    <span class="phone-lens"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="wheel-label">Zeit zurückdrehen</div>
+                    <div class="wheel-move instruction">und zu dir hin</div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Die Einführung liegt über der Bühne und geht mit dem Schütteln -->
+        <div class="intro is-waiting" id="intro">
+
+            <div class="intro-panel">
+                <h2>Wie viel Plastik produzieren wir eigentlich?</h2>
+                <p>Mikroplastik ist zu einem „ikonischen Symbol[...] anthropogener Abfälle und
+                    Umweltverschmutzung geworden“&#8239;<cite class="quelle" data-ref="de-souza-machado-2019" data-loc="S.6044">[1]</cite>. 
+                    Der Begriff erscheint immer häufiger in den Medien&#8239;<cite class="quelle" data-ref="hengstmann-tamminga-2022" data-loc="S.21">[2]</cite> 
+                    und gegenwärtig ist eine bedeutende Zunahme der Relevanz des Themas festzustellen. Dieser
+                    resultiert aus der weltweit steigenden Produktion von Kunststoffen&#8239;<cite class="quelle" data-ref="hengstmann-tamminga-2022" data-loc="S.5">[2]</cite>.</p>
+                <p>„Die weltweit produzierte Kunststoffmenge ist in den letzten 70 Jahren sehr stark gestiegen - auf etwa 430,9 Millionen Tonnen im Jahr 2024. 
+                    Treiber dieses Anstiegs sind in den vergangenen 20 Jahren, insbesondere asiatische Länder - vor allem China. 
+                    In Europa ist die Entwicklung weniger rasant. 
+                    In den letzten 10 Jahren stagnierte die Menge der pro Jahr hergestellten Kunststoffe in der europäischen Kunststoffindustrie.“&#8239;<cite class="quelle" data-ref="statista-2024" data-loc="">[3]</cite></p>
+                <p>Diese hohen und steigenden Produktionsmengen unterstreichen die weitreichende
+                    gesellschaftliche und wirtschaftliche Bedeutung von Kunststoffen und betonen deren
+                    Präsenz in der menschlichen Gesellschaft – ein Material, das nicht mehr aus dem Alltag
+                    wegzudenken ist.</p>
+                <p class="intro-note instruction">schütteln zum starten</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Script integrations -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="/js/interactions/inhalte/produktionsabriss.js"></script>
+    <script type="module" src="/js/interactions/inhalte/quellen-init.js"></script>
+</body>
+
+</html>

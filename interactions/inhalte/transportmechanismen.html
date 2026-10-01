@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transportmechanismen (Inhalte) - Labor</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inclusive+Sans:wght@300..700&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="/css/interaktion.css">
+
+    <style>
+        :root {
+            --bg-card: #ffffff;
+            --border-card: #e2e8f0;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+
+            --accent-green: #16a34a;
+            --accent-red: #dc2626;
+
+            --font-head: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            --font-text: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            font-family: var(--font-text);
+            font-weight: 400;
+            line-height: 1.5;
+            background-color: var(--bg-card);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ── Kopfleiste ─────────────────────────────────────────────── */
+        .topbar {
+            flex: none;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            padding: 0 28px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-card);
+        }
+
+        .topbar-left,
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .topbar h1 {
+            font-family: var(--font-head);
+            font-size: 1.05rem;
+            font-weight: 600;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 18px;
+            background: #ffffff;
+            border: 1px solid var(--border-card);
+            border-radius: 12px;
+            color: var(--text-main);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .back-btn:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+            transform: translateX(-4px);
+        }
+
+        .cal-btn {
+            padding: 9px 18px;
+            background: #ffffff;
+            border: 1px solid var(--border-card);
+            border-radius: 12px;
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .cal-btn:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 15px;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            background: rgba(220, 38, 38, 0.1);
+            border: 1px solid rgba(220, 38, 38, 0.2);
+            color: var(--accent-red);
+            transition: all 0.3s ease;
+        }
+
+        .status-badge.connected {
+            background: rgba(22, 163, 74, 0.1);
+            border: 1px solid rgba(22, 163, 74, 0.2);
+            color: var(--accent-green);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: currentColor;
+        }
+
+        /* ── Bühne ─────────────────────────────────────────────────────
+           Die Leinwände füllen die Bühne 1:1: Ihre Pixel-Auflösung setzt das
+           Skript (`resizeBoard`) auf die tatsächliche Bühnengröße, das Board
+           deckt sich also mit der Bühne – kein Rahmen, kein weißer Balken.
+           Die Zeichnung sitzt als eigenes, kleineres Bild darin unten links
+           (SCENE_* im Skript). */
+        .stage {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .earth-canvas,
+        .board-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Bühne bleibt unsichtbar, bis die Einführung tatsächlich geht –
+           sonst blitzt sie hinter der anfangs selbst unsichtbaren
+           Einführung auf (die wartet ihrerseits auf den geklärten
+           Verbindungszustand). Eingeblendet wird sie erst in
+           `dismissIntro`. */
+        .earth-canvas,
+        .board-canvas {
+            transition: opacity 0.5s ease;
+        }
+
+        .earth-canvas.is-waiting,
+        .board-canvas.is-waiting {
+            opacity: 0;
+        }
+
+        /* ── Einführung: schütteln zum starten ─────────────────────────
+           Weißer Grund über der Bühne, wie in den übrigen Modulen. Geht
+           per langem Schütteln, mit Klick als Maus-Fallback ohne Gerät.
+           Bleibt unsichtbar, bis die Kalibrierung den Verbindungszustand
+           geklärt hat – sonst blitzt sie vor der Offline-Anzeige auf. */
+        .intro {
+            position: absolute;
+            inset: 0;
+            z-index: 10;
+            background: var(--bg-card);
+            transition: opacity 0.5s ease;
+        }
+
+        .intro.is-waiting {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .intro.is-gone {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* ── Einführungsspiel: das Halten üben ──────────────────────────
+           Dieselbe Übung wie im ersten Teil: drei graue Löcher, drei
+           Kreise. Liegt über der Box (z-index 2 gegen 1), damit Zeiger und
+           Haltering auch über dem Text zu sehen sind. */
+        .lehre-game,
+        .intro-panel {
+            transition: opacity 0.4s ease;
+        }
+
+        .intro.is-waiting .lehre-game,
+        .intro.is-waiting .intro-panel {
+            opacity: 0;
+        }
+
+        .lehre-game {
+            position: absolute;
+            inset: 0;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .lehre-game.is-gone {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .intro-panel.pre-game {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .intro-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            /* Füllt die Bühne 1:1 wie `.board-canvas` – die Auflösung setzt
+               `resizeBoard` mit; beide Leinwände decken sich deshalb. */
+        }
+
+        .lehre-instruction {
+            position: absolute;
+            top: 12%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        /* ── Auswertungstext (nach dem Platzieren aller Objekte) ─────────
+           Erscheint rechts als Textspalte, im selben Textsatz wie die
+           intro-box (.intro-panel in css/interaktion.css). Lage (left/top/
+           width) setzt das Skript, bündig mit dem Text „Akkumulation". */
+        .result-text {
+            position: absolute;
+            z-index: 3;
+            color: var(--text-main);
+            font-size: 1rem;
+            line-height: 1.7;
+            text-align: left;
+            text-wrap: pretty;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+
+        .result-text.is-shown {
+            opacity: 1;
+        }
+
+        /* Ohne diese Regel setzt das UA-Stylesheet ein Top-Margin auf den
+           ersten Absatz – der Text stünde dann sichtbar tiefer als `top`. */
+        .result-text p {
+            margin: 0;
+        }
+
+        .result-text p + p {
+            margin-top: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <header class="topbar">
+        <div class="topbar-left">
+            <a href="/inhalte.html" class="back-btn">← Zurück</a>
+            <h1>Transportmechanismen</h1>
+        </div>
+        <div class="topbar-right">
+            <button id="calBtn" class="cal-btn">Mitte kalibrieren</button>
+            <div id="connBadge" class="status-badge">
+                <div class="status-dot"></div>
+                <span id="connStatusText">Offline</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="stage" id="stage">
+        <!-- Unterste Ebene: Erde und die Zeichnung (hintergrund.png) zusammen.
+             Beide sitzen als verkleinerte Szene unten links (SCENE_* im
+             Skript) und werden dort einmalig hineingemalt. -->
+        <canvas class="earth-canvas is-waiting" id="earthCanvas" width="3024" height="1964"></canvas>
+
+        <!-- Feste Auflösung wie das Board (BOARD_W × BOARD_H, im Skript
+             1512 × 982), doppelt für scharfe Kanten auf Retina. -->
+        <canvas class="board-canvas is-waiting" id="boardCanvas" width="3024" height="1964"></canvas>
+
+        <!-- Die Kalibrierung hängt sich das Modul js/lib/calibration.js
+             selbst hier herein. -->
+
+        <!-- Auswertungstext, erscheint erst wenn alle Objekte sitzen. Lage
+             setzt das Skript (layoutResultText). Platzhaltertext (Lorem). -->
+        <div class="result-text" id="resultText">
+            <p>Wasser nimmt Polymere auf und schwemmt sie in die Tiefe. 
+                Besonders bei starken Regenfällen begünstigt das entstehende Sickerwasser das Eindringen der Partikel 
+                in tiefere Erdschichten.</p>
+            <p>Durch Wurzelwachstum entstehen Makroporen, die als Transportwege dienen. 
+                Besonders Kunststofffasern heften sich oft direkt an die Wurzeln und gelangen so tiefer in den Untergrund.</p>
+            <p>Die Bodenstruktur aus Poren und Rissen trägt erheblich zum Transport bei. 
+                Durch Perkolation trägt das Sickerwasser selbst kleinste Partikel durch das gesamte Porensystem stetig nach unten. 
+                In Rissen wurden bereits besonders hohe Konzentrationen nachgewiesen.</p>
+            <p>Auch Bodenorganismen tragen entscheidend zur Verteilung bei. 
+                Ein Regenwurm frisst Plastikpartikel und scheidet sie in tieferen Schichten aus, 
+                oder sie bleiben direkt an seinem Körper hängen. Zudem bilden die Grabesysteme der Würmer vertikale Bahnen, 
+                durch die Partikel noch tiefer in den Boden vordringen können.</p>
+        </div>
+
+        <div class="intro is-waiting" id="intro">
+            <div class="lehre-game" id="lehreGame">
+                <canvas class="intro-canvas" id="introCanvas" width="3024" height="1964"></canvas>
+                <p class="instruction lehre-instruction">platziere die kreise</p>
+            </div>
+            <div class="intro-panel pre-game" id="introBox">
+                <h2>Wie wandert Mikroplastik eigentlich durch den Boden?</h2>
+                <p> Der Boden,  als terrestrisches Ökosystem, gilt als eine der größten Senken für Mikroplastik&#8239;<cite class="quelle" data-ref="rathikannu-2025" data-loc="S.11">[4]</cite>. 
+                    Ist ein Partikel erst einmal eingetragen, bleibt es selten an der Oberfläche: 
+                    Nach und nach verlagert es sich in tiefere Schichten und reichert sich dort an,
+                    diese Anhäufung nennt man Akkumulation.</p>
+                <p>Man unterscheidet dabei zwei Richtungen. Der horizontale Transport verteilt Mikroplastik durch Wind, 
+                    Regen und Bodenbearbeitung über die Fläche; die vertikale Verlagerung befördert es in die Tiefe. 
+                    Wie die Partikel nach unten wandern, bestimmen vor allem Sickerwasser, Poren und Risse sowie die 
+                    Bodenorganismen selbst.
+                </p>
+                <p class="intro-note instruction">schütteln zum starten</p>
+            </div>
+        </div>
+    </main>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="/js/interactions/inhalte/transportmechanismen.js"></script>
+    <script type="module" src="/js/interactions/inhalte/quellen-init.js"></script>
+</body>
+
+</html>

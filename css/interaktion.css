@@ -1,0 +1,233 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Gemeinsame Konventionen der Interaktions-Stationen
+
+   Was hier steht, gilt in allen Stationen gleich – gedacht für die wenigen
+   Dinge, die den Besucher durch die ganze Ausstellung begleiten und deshalb
+   überall gleich aussehen müssen. Alles Modul-eigene bleibt im jeweiligen
+   <style> der Station.
+
+   Eingebunden vor dem eigenen <style> der Seite: Was eine Station anders
+   braucht, überschreibt es damit einfach dort.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+    /* Die Akzentfarbe der Ausstellung. Sie liegt hier und nicht in den
+       Stationen, damit ein Wechsel eine einzige Änderung bleibt. Wer sie in
+       einer Station anders braucht, setzt sie dort im eigenen :root neu – das
+       kommt später im Dokument und gewinnt.
+
+       Als Zahlentripel, weil die Farbe an vielen Stellen durchscheinend
+       gebraucht wird – ein Ring, der aufklart, ein Schein am Rand. Aus einem
+       Hex-Wert lässt sich in CSS kein `rgba` bilden, aus dem Tripel dagegen
+       beides: Die Farbe selbst wird daraus abgeleitet, und damit bleibt es bei
+       einer Stelle, an der sie steht.
+       Ein Skript liest das Tripel über `getComputedStyle`, statt die Farbe ein
+       zweites Mal aufzuschreiben. */
+    --accent-rgb: 253, 100, 88;
+    --accent: rgb(var(--accent-rgb));
+
+    /* Die Anweisungen tragen den Akzent. Eigener Name, damit sich beides
+       trennen lässt, falls es einmal auseinandergehen soll. */
+    --instruction-color: var(--accent);
+}
+
+/* ── Anweisungen ────────────────────────────────────────────────────────────
+   Sätze, die den Besucher zu einer Bewegung auffordern: „schüttle, um zu
+   beginnen“, „neige zur Seite“, „drehe weiter“.
+
+   Sie sehen überall gleich aus, damit sie überall als dasselbe erkannt werden:
+   Der Besucher lernt einmal, dass diese Zeilen ihn meinen, und findet sie in
+   jeder Station wieder – auch dort, wo er den Text noch nicht gelesen hat.
+
+   Klein statt groß und leicht statt fett: Eine Anweisung ist kein Titel. Sie
+   trägt ihr Gewicht über die Farbe, nicht über die Größe – und über die
+   Kleinschreibung, die sie vom übrigen Text abhebt, ohne lauter zu werden.
+   Die Kleinschreibung geschieht nur in der Anzeige; im Markup steht der Satz
+   normal geschrieben und wird auch so vorgelesen. */
+.instruction {
+    /* geerbt aus dem umgebenden Kasten – 1rem, wo nichts anderes gilt */
+    font-size: 1rem;
+    font-weight: 400;
+    color: var(--instruction-color);
+    text-transform: lowercase;
+}
+
+/* ── Einführungsbox ─────────────────────────────────────────────────────────
+   Der Text, der vor einer Station steht: die Aufgabe einmal zu lesen, dann
+   aus dem Weg. Er sieht in jeder Station gleich aus, damit der Besucher ihn
+   überall als dieselbe Sache erkennt – deshalb steht die Form hier und nicht
+   in den Stationen.
+
+   Die Box sitzt am oberen Rand ihrer Fläche und ist dort mittig gestellt; sie
+   braucht also eine Fläche mit `position: relative` um sich. Was darunter
+   liegt und wie sie verschwindet, bleibt Sache der Station: Stapelebene,
+   Überblendung und der weiße Grund dahinter gehören zum jeweiligen Ablauf.
+
+   Die Farben und Schriften kommen aus dem :root der Station (--border-card,
+   --text-main, --font-head). Eine Station, die diese Namen nicht setzt, muss
+   sie ergänzen. */
+/* Die ganze Box hängt an einer einzigen Größe: Ihre Schriftgröße ist per
+   `clamp` an den Viewport gekoppelt (`vmin`, damit sie im Hochformat wie im
+   Querformat mitgeht), alle inneren Maße stehen in `em`. So wächst die Box als
+   Ganzes – Abstände, Titel, Radius, Aufzählungspunkt und Position skalieren
+   mit der Schrift –, statt auf großen Projektionen klein stehen zu bleiben.
+   Auf dem Handy hält die Untergrenze das bisherige Erscheinungsbild. */
+.intro-panel {
+    position: absolute;
+    top: 5em;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(40em, 86%);
+    padding: 1.5em 1.75em;
+    background: #ffffff;
+    border: 1px solid var(--border-card);
+    border-radius: 1em;
+    box-shadow: 0 8px 20px -6px rgba(0, 0, 0, 0.12);
+    font-size: clamp(1rem, 1.7vmin, 1.5rem);
+    line-height: 1.7;
+    color: var(--text-main);
+    text-align: left;
+    /* Verteilt den Umbruch über den ganzen Absatz, statt jede Zeile für sich
+       zu füllen – damit bleibt am Ende kein einzelnes Wort allein stehen. */
+    text-wrap: pretty;
+}
+
+.intro-panel h2 {
+    font-family: var(--font-head);
+    font-size: 1.3em;
+    font-weight: 600;
+    line-height: 1.25;
+    margin-bottom: 1.25em;
+}
+
+.intro-panel p {
+    margin-top: 0.75em;
+}
+
+/* Aufzählung mit eigenem Punkt: Das Zeichen des Browsers lässt sich nicht
+   einfärben, ohne die Schrift der Zeile mitzufärben. */
+.intro-panel ul {
+    margin-top: 0.5em;
+    list-style: none;
+}
+
+.intro-panel li {
+    position: relative;
+    padding-left: 1.25em;
+}
+
+.intro-panel li + li {
+    margin-top: 0.25em;
+}
+
+.intro-panel li::before {
+    content: '';
+    position: absolute;
+    left: 0.25em;
+    /* Mitte der ersten Zeile, unabhängig von Schriftgröße und Zeilenabstand */
+    top: 0.85em;
+    transform: translateY(-50%);
+    width: 0.44em;
+    height: 0.44em;
+    border-radius: 50%;
+    background: var(--text-main);
+}
+
+/* Was zu tun ist, steht zuletzt und abgesetzt: erst der Text, dann die
+   Bewegung, mit der es weitergeht. Das Aussehen kommt aus `instruction`. */
+.intro-note {
+    margin-top: 1.125em;
+    text-align: center;
+}
+
+/* Die Anweisungszeile in der Box skaliert mit ihr mit: `1em` statt der festen
+   Größe der globalen `.instruction` (die außerhalb der Box unberührt bleibt). */
+.intro-panel .instruction {
+    font-size: 1em;
+}
+
+/* ── Quellenangaben ─────────────────────────────────────────────────────────
+   Die Zitatmarke [n, S. x] im Fließtext. Sie trägt den Akzent, bleibt aber
+   ruhig: kleiner als der Text, nie umbrechend, als Ganzes antippbar. Der
+   Wortlaut wird vom Skript aus dem Register geschrieben (js/.../quellen.js);
+   was im HTML steht, ist nur die Fallback-Fassung. */
+.quelle {
+    font-style: normal;
+    font-size: 0.82em;
+    font-weight: 400;
+    /* Nimmt die Farbe des Umfelds an, nicht den Akzent: im Fließtext dunkel,
+       in einer grauen Beschriftung grau – der Verweis fügt sich überall ein
+       und unterbricht den Lesefluss nicht. */
+    color: inherit;
+    white-space: nowrap;
+    cursor: pointer;
+    /* etwas Luft zum vorangehenden Wort, ohne dass die Klammer wegrutscht */
+    padding: 0 0.1em;
+    border-radius: 4px;
+    transition: background 0.15s ease;
+}
+
+.quelle:hover,
+.quelle[aria-expanded="true"] {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.quelle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+/* Eine Quelle, deren Schlüssel das Register nicht kennt: sichtbar, aber
+   erkennbar unfertig. */
+.quelle-unbekannt {
+    color: var(--text-muted, #64748b);
+    text-decoration: underline dotted;
+}
+
+/* ── Popover ────────────────────────────────────────────────────────────────
+   Die vollständige Quellenangabe zur angetippten Marke. Am Handy noch nicht
+   erreichbar (die Anzeige wird bewegungsgesteuert), aber schon angelegt. */
+.quelle-popover {
+    position: fixed;
+    z-index: 1000;
+    max-width: min(420px, 90vw);
+    padding: 14px 16px;
+    background: #ffffff;
+    border: 1px solid var(--border-card, #e2e8f0);
+    border-radius: 12px;
+    box-shadow: 0 10px 28px -8px rgba(0, 0, 0, 0.28);
+    font-family: var(--font-text, inherit);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--text-main, #0f172a);
+    text-align: left;
+}
+
+.quelle-popover[hidden] {
+    display: none;
+}
+
+.quelle-popover-nr {
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 4px;
+}
+
+.quelle-popover-text {
+    margin-bottom: 10px;
+}
+
+/* Ohne folgenden Link kein hängender Abstand unten. */
+.quelle-popover-text:last-child {
+    margin-bottom: 0;
+}
+
+.quelle-popover-link {
+    color: var(--accent);
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.quelle-popover-link:hover {
+    text-decoration: underline;
+}

@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Größeneinordnung (Inhalte) - Labor</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inclusive+Sans:wght@300..700&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="/css/interaktion.css">
+
+    <style>
+        :root {
+            --bg-card: #ffffff;
+            --border-card: #e2e8f0;
+            /* Auch die Tinte als Tripel: Der Glow des eingeloggten
+               Zustands braucht sie durchscheinend. */
+            --ink-rgb: 15, 23, 42;
+            --text-main: rgb(var(--ink-rgb));
+            --text-muted: #64748b;
+
+            /* Urteilsfarben. Sie tragen das Verbindungs-Badge – Gerätezustand,
+               in jedem Modul gleich – und den Schein am Rand des Bildschirms,
+               der Richtig und Falsch meldet. Am Feld selbst kommt keine von
+               beiden vor.
+               Als Tripel wie der Akzent, weil der Schein sie durchscheinend
+               braucht und ein Skript sie liest. */
+            --ok-rgb: 22, 163, 74;
+            --bad-rgb: 220, 38, 38;
+            --accent-green: rgb(var(--ok-rgb));
+            --accent-red: rgb(var(--bad-rgb));
+
+            /* Eine Schrift für alles: Inclusive Sans ist auf Lesbarkeit hin
+               gezeichnet – offene Punzen, deutlich unterscheidbares I/l/1.
+               Überschrift und Fließtext trennt allein das Gewicht, 600
+               gegen 400. Dieselbe Paarung wie in den übrigen
+               Inhalts-Stationen. */
+            --font-head: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            --font-text: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        /* Das Modul füllt das Fenster; ein begrenzender Rand um die Fläche
+           kostet nur Platz – dieselbe Entscheidung wie bei den Eintragspfaden. */
+        body {
+            font-family: var(--font-text);
+            font-weight: 400;
+            line-height: 1.5;
+            background-color: var(--bg-card);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ── Kopfleiste ─────────────────────────────────────────────── */
+        /* Feste Höhe statt einer, die sich aus dem Inhalt ergibt: Nur so ist
+           die Fläche, die dem Spiel bleibt, im Voraus bekannt. */
+        .topbar {
+            flex: none;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            padding: 0 28px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-card);
+        }
+
+        .topbar-left,
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .topbar h1 {
+            font-family: var(--font-head);
+            font-size: 1.05rem;
+            font-weight: 600;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 18px;
+            background: #ffffff;
+            border: 1px solid var(--border-card);
+            border-radius: 12px;
+            color: var(--text-main);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .back-btn:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+            transform: translateX(-4px);
+        }
+
+        .cal-btn {
+            padding: 9px 18px;
+            background: #ffffff;
+            border: 1px solid var(--border-card);
+            border-radius: 12px;
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .cal-btn:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+        }
+
+        .cal-btn:active {
+            transform: scale(0.98);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 15px;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            background: rgba(220, 38, 38, 0.1);
+            border: 1px solid rgba(220, 38, 38, 0.2);
+            color: var(--accent-red);
+            transition: all 0.3s ease;
+        }
+
+        .status-badge.ready {
+            background: rgba(217, 119, 6, 0.1);
+            border: 1px solid rgba(217, 119, 6, 0.2);
+            color: #d97706;
+        }
+
+        .status-badge.connected {
+            background: rgba(22, 163, 74, 0.1);
+            border: 1px solid rgba(22, 163, 74, 0.2);
+            color: var(--accent-green);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: currentColor;
+        }
+
+        /* ── Bühne ─────────────────────────────────────────────────── */
+        /* Das Spielfeld bekommt die ganze Fläche unter der Kopfleiste. Die vier
+           Antwortfelder sitzen an den Rändern, die Frage in der Mitte. */
+        .stage {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            /* Gesteuert wird mit dem Smartphone; ein Mauszeiger, der irgendwo
+               im Bild stehen bleibt, ist hier nur ein vergessener Gegenstand.
+               Nur über dem Spielfeld – in der Kopfleiste wird geklickt. */
+            cursor: none;
+        }
+
+        /* Selection Options */
+        .option {
+            position: absolute;
+            font-family: var(--font-text);
+            font-size: 1.6rem;
+            font-weight: 400;
+            color: var(--text-main);
+            padding: 18px 36px;
+            user-select: none;
+            /* Kein Kasten: kein Rahmen, kein Grund, keine Ecken. Ein Rechteck
+               kommt in dieser Ausstellung nirgends sonst vor. Das Feld ist
+               allein seine Beschriftung – die Größe, im Überblick zusätzlich
+               das Beispiel darüber. */
+            transition: transform 0.15s ease, color 0.15s ease, opacity 0.5s ease;
+            text-align: center;
+            min-width: 245px;
+            /* Beispiel über der Angabe: erst das Motiv, dann seine Beschriftung. */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 14px;
+        }
+
+        /* ── Zweite Runde ──────────────────────────────────────────────
+           Was in der ersten Runde die Aufgabe war – welcher Begriff zu welcher
+           Größe gehört –, steht jetzt als Gegebenes an den Rändern: Die
+           Begriffe erscheinen über den Größen, die Tüten treten ab. Gefragt
+           sind stattdessen Beispiele in der Mitte.
+           Der Zustand hängt an der Bühne, nicht an den einzelnen Feldern: Es
+           ist ein Wechsel der ganzen Station, kein Zustand von vier Kacheln. */
+        .option-term {
+            /* Kein eigener Satz: Begriff und Größe sind beides die Angabe des
+               Feldes, nur zwei Zeilen davon – derselbe Stil wie `.option-label`,
+               von dort geerbt (Schrift, Größe, Gewicht aus `.option`). */
+            /* In der ersten Runde ohne Höhe: Die Felder sollen dort keinen
+               Platz für etwas freihalten, das noch nicht zu sehen ist. */
+            display: none;
+        }
+
+        .stage.is-round-two .option-term {
+            display: block;
+        }
+
+        .stage.is-round-two .option {
+            gap: 4px;
+        }
+
+
+        /* ── Schleier vor dem Überblick ─────────────────────────────────
+           Deckt den Sprung der vier Felder von den Rändern in die Reihe:
+           Voll deckend, sonst schiene die Umordnung sichtbar durch. Beim
+           Wechsel Runde 1 → 2 liegt zusätzlich der Splash obendrauf, hier
+           trägt der Schleier allein. */
+        .veil {
+            position: absolute;
+            inset: 0;
+            z-index: 9;
+            background: #fff;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+
+        .stage.is-announcing .veil {
+            opacity: 1;
+        }
+
+        /* Der Cursor gehört zur Auswahl und geht mit ihr – zwischen den Runden
+           wie im Überblick, wo es nichts mehr zu wählen gibt. Über
+           `visibility`, nicht über `opacity`: Die Deckkraft der Bubble setzt
+           das Skript bei jeder Messung neu, eine Regel dazu hier bliebe
+           wirkungslos. */
+        .stage.is-announcing .bubble,
+        .stage.is-summary .bubble {
+            visibility: hidden;
+        }
+
+        /* ── Überblick nach der zweiten Runde ──────────────────────────
+           Am Ende steht nicht, dass gelöst wurde, sondern was dabei
+           herausgekommen ist: die vier Klassen nebeneinander, jede mit
+           Begriff, Größe und ihren Beispielen.
+           Es sind dieselben vier Felder, sie ordnen sich nur neu – so bleibt
+           jede Angabe an einer Stelle im Markup. Ihre Reihenfolge ist die der
+           Größen, von der größten links zur kleinsten rechts; dass sie
+           vorher oben, links, rechts und unten standen, spielt hier keine
+           Rolle mehr.
+           Umgestellt wird, während die Felder ausgeblendet sind; die Reihe
+           blendet dann als Ganzes ein. Die Ordnung steckt in ihrer Anordnung,
+           sie muss nicht auch noch in der Zeit vorgeführt werden. */
+        .option-example {
+            display: none;
+            width: 100%;
+            object-fit: contain;
+        }
+
+        .stage.is-summary .option-example {
+            display: block;
+            max-height: 130px;
+        }
+
+        /* Dieselbe Rechnung wie in der Mitte: Ein aufrechtes Motiv steht unter
+           einer gemeinsamen Höhe schmaler da als die liegenden und wirkt
+           dadurch kleiner, obwohl es genauso hoch ist. */
+        .stage.is-summary .option-example.is-upright {
+            max-height: 170px;
+        }
+
+        .stage.is-summary .option.top,
+        .stage.is-summary .option.left,
+        .stage.is-summary .option.right,
+        .stage.is-summary .option.bottom {
+            top: 50%;
+            bottom: auto;
+            right: auto;
+            /* Vier Klassen im Selektor, damit die Regel auch gegen die
+               Sonderfälle der einzelnen Ränder steht. */
+            transform: translate(-50%, -50%);
+            min-width: 0;
+            width: 21%;
+            padding: 16px 14px;
+            gap: 12px;
+            /* Im Überblick wird allein die Deckkraft überblendet. Die
+               Umstellung selbst hat schon stattgefunden, während die Felder
+               unsichtbar waren – liefe sie mit, schöbe sich jede Karte beim
+               Erscheinen noch um ihre halbe Höhe. */
+            transition: opacity 0.6s ease;
+        }
+
+        /* Reihenfolge von der größten Klasse links zur kleinsten rechts. Nach
+           dem Tausch sitzt Makro unten und Nano oben – die Ränder ordnen sich
+           deshalb bottom, left, right, top. */
+        .stage.is-summary .option.bottom {
+            left: 12.5%;
+        }
+
+        .stage.is-summary .option.left {
+            left: 37.5%;
+        }
+
+        .stage.is-summary .option.right {
+            left: 62.5%;
+        }
+
+        .stage.is-summary .option.top {
+            left: 87.5%;
+        }
+
+        .stage.is-summary.is-announcing .summary-hint {
+            opacity: 0;
+            transition-delay: 0s;
+        }
+
+        /* Wie es weitergeht, steht unter der Reihe – nicht in ihr. Die vier
+           Karten sind das Ergebnis, der Hinweis ist die Bedienung, und beides
+           soll sich nicht ins Gehege kommen.
+           Er kommt mit der Reihe und geht mit ihr: Solange gespielt wird, ist
+           er nicht da. */
+        .summary-hint {
+            position: absolute;
+            bottom: 13%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(560px, 80%);
+            text-align: center;
+            line-height: 1.7;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.6s ease;
+            /* Liegt über dem unteren Banner – sonst deckt dessen Bildfläche
+               den Text ab, wo sich beide überlappen. */
+            z-index: 1;
+            /* Farbe, Größe und Kleinschreibung: Klasse `instruction` */
+        }
+
+        /* Einen Atemzug nach der Reihe: erst das Ergebnis, dann die Frage, wie
+           es weitergeht. */
+        .stage.is-summary .summary-hint {
+            opacity: 1;
+            transition-delay: 0.5s;
+        }
+
+        /* Handschriftlicher Rahmen um den Überblick, dieselbe Logik wie
+           .summary-hint: kommt mit der Reihe und geht mit ihr. Die Bilder
+           sind breite Bänder (Seitenverhältnis ~5:1) und laufen über die
+           ganze Breite der Bühne. */
+        .summary-ende {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 94%;
+            object-fit: contain;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .summary-ende-top { top: 0; }
+        .summary-ende-bottom { bottom: -60px; }
+
+        .stage.is-summary .summary-ende {
+            opacity: 1;
+        }
+
+        /* Auf Höhe des oberen Zielpunkts – nicht mehr über ihm: Der Punkt
+           sitzt exakt beim Kippwinkel, der im Spiel „oben" auslöst
+           (LEHRE_ZIELE), ihn zu verschieben hieße, eine falsche Kippweite zu
+           üben. Der Text weicht ihm deshalb seitlich aus, in zwei Hälften
+           links und rechts vom Punkt statt einer Zeile über ihm.
+           (Eine zweite Fassung mit `mix-blend-mode` bzw. per `clip-path`
+           weiß maskiertem Text – beides mittig über dem Punkt – wurde
+           verworfen: unordentlicher als diese Lösung.)
+           Das Aussehen kommt aus der Klasse `instruction`
+           (css/interaktion.css). */
+        .lehre-text {
+            position: absolute;
+            top: 12%;
+            transform: translateY(-50%);
+            white-space: nowrap;
+            font-family: var(--font-head);
+            z-index: 3;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+        }
+
+        .lehre-text-left {
+            right: calc(50% + 60px);
+            text-align: right;
+        }
+
+        .lehre-text-right {
+            left: calc(50% + 60px);
+            text-align: left;
+        }
+
+
+
+        /* ── Einführung ────────────────────────────────────────────────
+           Die Aufgabe steht vor dem Spiel, nicht daneben: Sie ist einmal zu
+           lesen und dann aus dem Weg. Dieselbe Dramaturgie wie in den
+           Eintragspfaden und in der Begriffseinordnung – ein Text, den
+           Schütteln beendet.
+           Aufbau wie in Eintragspfade 2: Der Grund deckt, statt zu schleiern.
+           Das Spielfeld dahinter wäre hier ohnehin nur Kulisse – die Fläche
+           gehört der Einführung, und das Einführungsspiel wird sie brauchen. */
+        .intro {
+            position: absolute;
+            inset: 0;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-card);
+            transition: opacity 0.5s ease;
+        }
+
+        .intro.is-gone {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Vor der Kalibrierung ist die Einführung schon da, aber leer: Der
+           weiße Grund deckt das Spielfeld, Text und Spiel warten.
+           Nötig, weil sich die Kalibrierung bis zu 700 ms unsichtbar hält, bis
+           der Verbindungszustand gemeldet ist – sonst stünde in dieser Lücke
+           „bitte verbinden" auf dem Schirm, obwohl längst ein Gerät hängt.
+           Ohne diese Regel blitzte in derselben Lücke die Einführung samt
+           ihren Punkten auf und verschwand wieder unter dem Overlay. */
+        .intro-box,
+        .lehre-game {
+            transition: opacity 0.4s ease;
+        }
+
+        .intro.is-waiting .intro-box,
+        .intro.is-waiting .lehre-game {
+            opacity: 0;
+        }
+
+        /* Vor dem Einführungsspiel ist die Box verborgen; sie tritt erst hervor,
+           wenn alle vier Richtungen einmal angehalten wurden. */
+
+        .intro-box.pre-game {
+            display: none;
+        }
+
+        /* Eigenes Overlay für das Einführungsspiel, getrennt von der Box –
+           wie in Eintragspfade 1, Produktionsabriss und 3 Bereiche: Zeiger,
+           Punkte und Text blenden ab und gehen aus dem DOM, bevor die Box
+           erscheint, statt nur an Ort und Stelle unsichtbar zu werden. */
+        .lehre-game.is-gone {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Die Zeichenfläche des Einführungsspiels liegt über der Box, nicht
+           hinter ihr: Die vier Punkte sitzen an den Rändern, der Zeiger läuft
+           zwischen ihnen hindurch – und muss dabei über den Text hinweg, sonst
+           verschwände er auf halbem Weg. Anfassen lässt sie sich nicht, sie
+           ist nur Bild. Ebenso in Eintragspfade 2. */
+        .lehre-game {
+            position: absolute;
+            inset: 0;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .intro-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Eigene Ebene, damit das Einführungsspiel darum herum – und darüber –
+           zeichnen kann, ohne dass der Text darin untergeht. Form und
+           Textsatz kommen aus css/interaktion.css (.intro-panel) – dieselbe
+           Box wie in Eintragspfade 1, Produktionsabriss und Fragmentierung. */
+        .intro-box {
+            z-index: 11;
+        }
+
+        /* Was zu tun ist, steht zuletzt und abgesetzt: erst die Aufgabe, dann
+           die Bewegung, die sie in Gang setzt. */
+        .round-note-hint {
+            margin: 20px 0 0;
+            /* Farbe, Größe und Kleinschreibung: Klasse `instruction` */
+        }
+
+        /* ── Rückmeldung ───────────────────────────────────────────────
+           Zwei Zeichen, und keines wiederholt das andere:
+
+             angesteuert     Angabe im Akzent – das Feld hängt an deiner Bewegung
+             richtig/falsch  ein Schein am Rand des ganzen Bildschirms
+
+           Am Feld selbst gibt es keine Urteilsfarbe. Der Akzent der
+           Ausstellung ist ein warmes Rot; ein rotes „falsch" daneben wäre aus
+           drei Metern nicht von dem zu unterscheiden, was überall sonst „das
+           hängt gerade an dir" bedeutet. Das Urteil steht deshalb am Rand, wo
+           es keine andere Farbe stört – wie im Modul „3 Bereiche". */
+
+        /* Option Positions with centered translates */
+        .option.top {
+            top: 48px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .option.top.selected {
+            transform: translateX(-50%) scale(1.04);
+        }
+
+        .option.bottom {
+            bottom: 48px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .option.bottom.selected {
+            transform: translateX(-50%) scale(1.04);
+        }
+
+        .option.left {
+            left: 48px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .option.left.selected {
+            transform: translateY(-50%) scale(1.04);
+        }
+
+        .option.right {
+            right: 48px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .option.right.selected {
+            transform: translateY(-50%) scale(1.04);
+        }
+
+        /* ── Mitte ─────────────────────────────────────────────────────
+           Zwei Blöcke teilen sich denselben Platz: In der ersten Runde steht
+           dort der gefragte Begriff, in der zweiten das Beispiel. Sichtbar ist
+           immer nur einer, und beide kommen und gehen auf dieselbe Weise –
+           die Regeln stehen deshalb an der gemeinsamen Klasse, nicht an den
+           beiden Kästen einzeln. */
+        /* Die Mitte liegt über dem Schleier – sonst läge die Rundenansage
+           unter ihm, weiß überzogen und weichgezeichnet.
+           Die Stapelebene muss dafür hier stehen und nicht an den Kästen
+           darin: `z-index` wirkt nur auf positionierte Elemente, und die
+           Kästen sind es nicht. An ihnen stand die Angabe jahrelang wirkungs-
+           los; sichtbar wurde das erst, als es unter ihnen etwas zu überdecken
+           gab. */
+        .center-visualizer {
+            position: relative;
+            z-index: 11;
+            top: -40px;
+        }
+
+        /* ── Runden-Splash ─────────────────────────────────────────────
+           Ersetzt den Schleier bei der Rundenansage: weißer Grund mit
+           zufällig verteilten Schnipseln. Der Text liegt drüber (z-index 11). */
+        .round-splash {
+            position: absolute;
+            inset: 0;
+            z-index: 10;
+            background: #fff;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .stage.is-splash .round-splash { opacity: 1; }
+
+        /* Die Ansage kommt mit dem Grund, nicht vor ihm: dieselbe Dauer,
+           dieselbe Kurve wie der Splash darunter. Sonst stünde der Text
+           schon lesbar über dem Feld der vorigen Runde, während dahinter
+           erst das Weiß aufzieht. */
+        @keyframes round-note-in {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
+
+        .q-box.with-splash {
+            animation: round-note-in 0.5s ease both;
+        }
+
+        .q-box {
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .q-box.slide-out {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        .q-box.slide-in-prepare {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: none;
+        }
+
+        .q-box.is-hidden {
+            display: none;
+        }
+
+        .category-label {
+            font-family: var(--font-text);
+            font-size: 0.85rem;
+            letter-spacing: 0.08em;
+            font-weight: 400;
+            color: var(--text-muted);
+        }
+
+        .question-img {
+            margin-top: 6px;
+            max-height: 60px;
+            max-width: 260px;
+            object-fit: contain;
+        }
+
+        /* Das Beispielbild der zweiten Runde.
+           Die vier Bilder haben sehr verschiedene Formate – „makro" ist fast
+           quadratisch, „nano" mehr als dreimal so breit wie hoch. Die Fläche
+           gibt deshalb der Rahmen vor und das Bild passt sich ein; bestimmte
+           das Bild die Fläche, spränge die Mitte bei jedem Wechsel.
+           Die Maße halten Abstand zu den Feldern an den Rändern: Die stehen
+           links und rechts rund 365 Pixel weit herein, oben und unten je etwa
+           160. */
+        /* `--zoom` gleicht aus, was das gemeinsame Maß nicht auffangen kann:
+           Ein aufrechtes Bild wird von der Höhe begrenzt und füllt die Fläche
+           nur schmal aus, ein liegendes von der Breite. Der Becher stand
+           dadurch deutlich kleiner da als Reis und DNA. Welcher Wert wo gilt,
+           steht bei den Beispielen im Skript. */
+        .example-frame {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: min(30vw, 460px);
+            height: calc(min(28vh, 240px) * var(--zoom, 1));
+            margin-top: 8px;
+        }
+
+        .example-img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        /* ── Ankündigung der zweiten Runde ─────────────────────────────
+           Steht allein in der leeren Mitte, während die Felder zurücktreten. */
+        .round-note-title {
+            max-height: 60px;
+            max-width: 260px;
+            object-fit: contain;
+        }
+
+        .round-note-sub {
+            margin-top: 10px;
+            font-size: 1rem;
+            line-height: 1.7;
+            color: var(--text-main);
+        }
+
+        /* Die Erklärung steht unter der Ansage, nicht an ihrer Stelle: Wer
+           schon weiß, worum es geht, liest die zwei Zeilen darüber und ist
+           fertig. */
+        .round-note-text {
+            max-width: 430px;
+            margin-top: 18px;
+            font-size: 1rem;
+            line-height: 1.7;
+            text-align: center;
+            color: var(--text-main);
+        }
+
+
+
+
+        /* Der Zeiger ist in der Box „verschwunden" – sie ist jetzt der Cursor
+           und sagt das über ihre Linie, nicht über ihre Fläche. Eine gefüllte
+           Fläche liest sich als anderes Material; eine Linie liest sich als
+           Zustand.
+           Den Akzent trägt in der ganzen Ausstellung das, was gerade von der
+           eigenen Bewegung abhängt – hier also genau dieses Feld. */
+        .option.top.cursor-active {
+            transform: translateX(-50%) scale(1.04);
+        }
+
+        .option.bottom.cursor-active {
+            transform: translateX(-50%) scale(1.04);
+        }
+
+        .option.left.cursor-active {
+            transform: translateY(-50%) scale(1.04);
+        }
+
+        .option.right.cursor-active {
+            transform: translateY(-50%) scale(1.04);
+        }
+
+        .bubble {
+            width: 33px;
+            height: 33px;
+            background: rgba(0, 0, 0, 0.200);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            margin-top: -16.5px;
+            margin-left: -16.5px;
+            will-change: transform;
+            z-index: 2;
+            transition: transform 0.12s ease-out, opacity 0.15s ease;
+        }
+
+        /* ── Halte-Ring ────────────────────────────────────────────────
+           Ein SVG-Element pro Feld: Es enthält <defs><mask> mit den
+           Pfaden und ein <image> mit strich.png, das die Maske trägt.
+           Maske und Bild sind im selben SVG-Dokument – keine
+           Dokument-übergreifenden ID-Referenzen nötig. */
+        /* viewBox 499×307 = PNG-Größe; Seitenverhältnis ≈ 1.625 */
+        .lock-ring {
+            position: absolute;
+            width: 260px;
+            height: 160px;
+            top: calc(50% - 80px);
+            left: calc(50% - 130px);
+            pointer-events: none;
+            overflow: visible;
+        }
+
+        /* Runde 1 nutzt kringel.png, Runde 2 kringel2.png – umgeschaltet
+           über .is-round-two an der Bühne, wie der Rest der Runden-Optik. */
+        .lock-ring-r2 { display: none; }
+        .stage.is-round-two .lock-ring-r1 { display: none; }
+        .stage.is-round-two .lock-ring-r2 { display: block; }
+
+        /* ── Schnipsel-Grafik ──────────────────────────────────────────────
+           Liegt absolut hinter dem Labeltext, in beiden Runden sichtbar.
+           Position anpassen: top/left in #optTop .option-schnipsel usw. */
+        .option-schnipsel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        #optBottom .option-schnipsel { top: 70%; }
+        #optRight  .option-schnipsel { top: 55%; }
+
+        /* Abweichende Position nur in Runde 2 (muss nach der Grundregel
+           stehen und denselben oder einen spezifischeren Selektor haben,
+           sonst gewinnt die Regel oben). */
+        .stage.is-round-two #optBottom .option-schnipsel { top: 70%; }
+        .stage.is-round-two #optTop .option-schnipsel { top: 45%; }
+        .stage.is-round-two #optRight .option-schnipsel { top: 65%; }
+        .stage.is-round-two #optLeft .option-schnipsel { top: 55%; }
+
+        /* Im Überblick treten die Felder eng zusammen; die Schnipsel dahinter
+           kollidieren dabei nur noch mit Beispielbild und Nachbarfeld. */
+        .stage.is-summary .option-schnipsel {
+            display: none;
+        }
+
+        @keyframes schnipsel-shake {
+            0%, 100% { transform: translate(-50%, -50%) translateX(0); }
+            20%       { transform: translate(-50%, -50%) translateX(-14px); }
+            40%       { transform: translate(-50%, -50%) translateX(14px); }
+            60%       { transform: translate(-50%, -50%) translateX(-9px); }
+            80%       { transform: translate(-50%, -50%) translateX(9px); }
+        }
+
+        .option.wrong .option-schnipsel {
+            animation: schnipsel-shake 0.45s ease-in-out;
+        }
+
+        /* ── Runde 2: Schütteln bei falsch ────────────────────────────────
+           Hier gibt es keine Tüte, die hinter der Angabe wackeln könnte – die
+           Angabe ist ja selbst die Antwort. Statt der Tüte schüttelt deshalb
+           der ganze Antworttext: Begriff, Beispielbild und Größe zusammen,
+           mit derselben Bewegung wie der Schnipsel in Runde 1. */
+        @keyframes option-text-shake {
+            0%, 100% { transform: translateX(0); }
+            20%       { transform: translateX(-14px); }
+            40%       { transform: translateX(14px); }
+            60%       { transform: translateX(-9px); }
+            80%       { transform: translateX(9px); }
+        }
+
+        .stage.is-round-two .option.wrong .option-example,
+        .stage.is-round-two .option.wrong .option-term,
+        .stage.is-round-two .option.wrong .option-label {
+            animation: option-text-shake 0.45s ease-in-out;
+        }
+
+        .option.wrong .lock-ring {
+            opacity: 0;
+            transition: opacity 0.15s ease;
+        }
+
+        /* Dashboard overlay – am unteren Rand eingeblendet, standardmäßig aus.
+           Über den Schalter in der Kopfleiste erreichbar. */
+        .sensor-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: 16px;
+            padding: 14px 22px;
+            display: none;
+            justify-content: center;
+            gap: 24px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            box-shadow: 0 8px 20px -6px rgba(0, 0, 0, 0.12);
+        }
+
+        .sensor-panel strong {
+            color: var(--text-main);
+        }
+    </style>
+</head>
+
+<body>
+    <header class="topbar">
+        <div class="topbar-left">
+            <a href="/inhalte.html" class="back-btn">← Zurück</a>
+            <h1>Größeneinordnung</h1>
+        </div>
+        <div class="topbar-right">
+            <button id="toggleSensorBtn" class="cal-btn">Sensordaten</button>
+            <button id="calBtn" class="cal-btn"
+                title="Setzt die aktuelle Smartphone-Ausrichtung als Nullpunkt (Leertaste)">
+                Mitte kalibrieren
+            </button>
+            <!-- Nur zum Testen: springt direkt zu Runde 2, ohne Runde 1 zu spielen. -->
+            <button id="skipToRoundTwoBtn" class="cal-btn">Runde 2</button>
+            <div id="connBadge" class="status-badge">
+                <div class="status-dot"></div>
+                <span id="connStatusText">Offline</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Bühne: vier Antwortfelder an den Rändern, Frage in der Mitte -->
+    <main class="stage" id="stage">
+        <!-- Top Option (1) -->
+        <!-- Der Begriff ist in der ersten Runde die gesuchte Antwort und
+             deshalb noch nicht zu sehen; ab der zweiten steht er über der
+             Größe. -->
+        <div id="optTop" class="option top">
+            <img class="option-schnipsel" src="/img/interactionen/groessen/nanoSchnipsel.png" alt="">
+            <img class="option-example" src="/img/interactionen/groessen/nano.png" alt="">
+            <span class="option-term">Nanoplastik</span>
+            <span class="option-label">&lt; 1&#8239;μm</span>
+        </div>
+
+        <!-- Left Option (4) -->
+        <div id="optLeft" class="option left">
+            <img class="option-schnipsel" src="/img/interactionen/groessen/mesoSchnipsel.png" alt="">
+            <img class="option-example" src="/img/interactionen/groessen/meso.png" alt="">
+            <span class="option-term">Mesoplastik</span>
+            <span class="option-label">2,5&#8239;cm&#8239;–&#8239;5&#8239;mm</span>
+        </div>
+
+        <!-- Center Visualizer with Question -->
+        <div class="center-visualizer">
+            <!-- Runde 1: gefragt ist die Größe eines Begriffs -->
+            <div id="questionContainer" class="q-box">
+                <img id="questionText" class="question-img" src="" alt="">
+            </div>
+
+            <!-- Runde 2: gefragt ist die Klasse eines Vergleichsobjekts.
+                 Bild setzt das Skript, die Liste der vier Beispiele steht
+                 dort. -->
+            <!-- Ohne Überschrift: Was zu tun ist, stand in der Ankündigung der
+                 Runde. Über jedem Bild dieselbe Frage zu wiederholen, hilft
+                 nach dem ersten Beispiel niemandem mehr.
+                 Ohne Bildunterschrift: Der Name steht nur noch im alt-Text,
+                 für eine Vorlesehilfe – auf dem Schirm ist er nicht zu sehen. -->
+            <div id="exampleContainer" class="q-box is-hidden">
+                <div class="example-frame" id="exampleFrame">
+                    <img id="exampleImg" class="example-img" src="" alt="">
+                </div>
+            </div>
+
+            <!-- Vor jeder Runde: steht allein in der Mitte, bis sie beginnt.
+                 Zwei Kästen statt eines, dessen Text gewechselt wird – so
+                 bleibt beides an einer Stelle lesbar und änderbar. -->
+            <div id="roundNoteOne" class="q-box is-hidden">
+                <img class="round-note-title" src="/img/interactionen/groessen/runde1.png" alt="Runde 1">
+                <p class="round-note-hint instruction">schütteln zum starten</p>
+            </div>
+
+            <div id="roundNoteTwo" class="q-box is-hidden">
+                <img class="round-note-title" src="/img/interactionen/groessen/runde2.png" alt="Runde 2">
+                <p class="round-note-hint instruction">schütteln zum starten</p>
+            </div>
+
+            <div id="bubble" class="bubble"></div>
+        </div>
+
+        <!-- Right Option (3) -->
+        <div id="optRight" class="option right">
+            <img class="option-schnipsel" src="/img/interactionen/groessen/mikroSchnipsel.png" alt="">
+            <img class="option-example" src="/img/interactionen/groessen/mikro.png" alt="">
+            <span class="option-term">Mikroplastik</span>
+            <span class="option-label">5&#8239;mm&#8239;–&#8239;1&#8239;μm</span>
+        </div>
+
+        <!-- Bottom Option (2) -->
+        <div id="optBottom" class="option bottom">
+            <img class="option-schnipsel" src="/img/interactionen/groessen/makroSchnipsel.png" alt="">
+            <img class="option-example is-upright" src="/img/interactionen/groessen/makro.png" alt="">
+            <span class="option-term">Makroplastik</span>
+            <span class="option-label">&gt; 2,5&#8239;cm</span>
+        </div>
+
+        <!-- Vorhang für die Rundenansagen; liegt über dem Spielfeld, aber
+             unter den Kästen in der Mitte -->
+        <div class="veil"></div>
+
+        <!-- Schnipsel-Hintergrund für die Runde-1-Ankündigung -->
+        <div id="roundSplash" class="round-splash"></div>
+
+        <!-- Steht unter dem Überblick und nur dort -->
+        <p class="summary-hint instruction">Schüttle, um noch einmal zu beginnen.
+            Langes Schütteln führt zurück auf die Karte.</p>
+
+        <!-- Handschriftlicher Abschluss, nur im Überblick sichtbar -->
+        <img class="summary-ende summary-ende-top" src="/img/interactionen/groessen/endeOben.png" alt="">
+        <img class="summary-ende summary-ende-bottom" src="/img/interactionen/groessen/endeUnten.png" alt="">
+
+        <!-- Die Einführung liegt über dem Spielfeld und geht mit dem
+             Schütteln -->
+        <div class="intro is-waiting" id="intro">
+            <!-- Einführungsspiel: eigenes Overlay, das quer über die ganze
+                 Fläche zeichnet. Wer den Text liest, hat die Punkte gleich
+                 neben sich; wer die Bedienung schon kennt, schüttelt einfach.
+                 Tritt komplett ab (Fade + Entfernen aus dem DOM), sobald alle
+                 vier Richtungen gehalten wurden – wie in Eintragspfade 1,
+                 Produktionsabriss und 3 Bereiche. -->
+            <div class="lehre-game" id="lehreGame">
+                <canvas class="intro-canvas" id="introCanvas"></canvas>
+                <span class="lehre-text lehre-text-left instruction">Kippe in jede Richtung</span>
+            <span class="lehre-text lehre-text-right instruction">und halte kurz</span>
+            </div>
+            <!-- Erscheint erst, nachdem das Einführungsspiel abgeschlossen ist. -->
+            <div class="intro-box pre-game intro-panel">
+                <h2>Wie groß ist Mikroplastik?</h2>
+                <p>Obwohl die Debatte um die Umweltbelastung durch Kunststoffe in ihrer Gesamtheit
+                    geführt wird, liegt in der Forschung und in den Medien der Fokus inzwischen besonders 
+                    auf einer spezifischen Größenkategorie. Um Kunststoffe genauer einordnen zu
+                    können, werden sie anhand der Partikelgröße in vier Größenklassen unterteilt:</p>
+                <ul>
+                    <li>Makroplastik</li>
+                    <li>Mesoplastik</li>
+                    <li>Mikroplastik</li>
+                    <li>Nanoplastik</li>
+                </ul>
+                <p>In zwei Runden ordnest du erst die Begriffe ihren Größen zu
+                    und dann bekannte Gegenstände den Klassen.</p>
+                <p class="intro-note instruction">schütteln zum starten</p>
+            </div>
+        </div>
+
+        <!-- Dynamische Sensordaten – über den Schalter oben einblendbar -->
+        <div class="sensor-panel">
+            <div>Beta (Neigung): <strong id="betaVal">0°</strong> (Baseline: <span id="baseBeta">90°</span>)</div>
+            <div>Gamma (Kippen): <strong id="gammaVal">0°</strong> (Baseline: <span id="baseGamma">0°</span>)</div>
+            <div>Aktuelle Auswahl: <strong id="activeSelect" style="color: var(--accent);">Keine</strong></div>
+        </div>
+    </main>
+
+    <!-- Grüner Schein am Rand des Bildschirms zum Abschluss einer Runde;
+         liegt über der ganzen Seite, nicht nur über dem Spielfeld -->
+
+    <!-- Script integrations -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="/js/interactions/inhalte/groesseneinordnung.js"></script>
+    <script type="module" src="/js/interactions/inhalte/quellen-init.js"></script>
+</body>
+
+</html>

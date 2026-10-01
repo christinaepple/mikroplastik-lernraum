@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eintragspfade (Inhalte) - Labor</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inclusive+Sans:wght@300..700&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="/css/interaktion.css">
+
+    <style>
+        :root {
+            --bg-card: #ffffff;
+            --border-card: #e2e8f0;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+
+            --accent-green: #16a34a;
+            --accent-red: #dc2626;
+
+            --sel-accent: #fd6458;
+
+            --font-head: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            --font-text: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            font-family: var(--font-text);
+            font-weight: 400;
+            line-height: 1.5;
+            background-color: var(--bg-card);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .topbar {
+            flex: none;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            padding: 0 28px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-card);
+        }
+
+        .topbar-left,
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .topbar h1 {
+            font-family: var(--font-head);
+            font-size: 1.05rem;
+            font-weight: 600;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 18px;
+            background: #ffffff;
+            border: 1px solid var(--border-card);
+            border-radius: 12px;
+            color: var(--text-main);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .back-btn:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+            transform: translateX(-4px);
+        }
+
+        .cal-btn {
+            padding: 9px 18px;
+            background: #ffffff;
+            border: 1px solid var(--border-card);
+            border-radius: 12px;
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .cal-btn:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 15px;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            background: rgba(220, 38, 38, 0.1);
+            border: 1px solid rgba(220, 38, 38, 0.2);
+            color: var(--accent-red);
+            transition: all 0.3s ease;
+        }
+
+        .status-badge.connected {
+            background: rgba(22, 163, 74, 0.1);
+            border: 1px solid rgba(22, 163, 74, 0.2);
+            color: var(--accent-green);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: currentColor;
+        }
+
+        /* ── Bühne ─────────────────────────────────────────────────── */
+        .stage {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Die Collage bleibt bis zum Ende der Einführung verdeckt. So kann
+           sie weder vor der Kalibrierung noch zwischen Übung und Intro kurz
+           aufblitzen. Die Kalibrierung und Overlays sind eigene Kinder und
+           bleiben sichtbar. */
+        .stage.is-covered > .layer,
+        .stage.is-covered > .area,
+        .stage.is-covered > .idle {
+            visibility: hidden;
+        }
+
+        .area {
+            --selection-progress: 0;
+            position: absolute;
+            inset: 0;
+        }
+
+        .layer {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: opacity 0.25s ease;
+        }
+
+        .layer.overlay {
+            opacity: 0;
+        }
+
+        .area.is-active .layer.base {
+            opacity: calc(1 - var(--selection-progress));
+        }
+
+        .area.is-active .layer.overlay {
+            opacity: var(--selection-progress);
+        }
+
+        /* ── Eingerastet ───────────────────────────────────────────── */
+        .stage.is-focused .layer {
+            opacity: var(--zurueck, 0);
+        }
+
+        /* Die Umrisse der übrigen Ecken bleiben dabei fort – zurück kommt die
+           Collage, nicht deren Zeichnung. */
+        .stage.is-focused .layer.overlay {
+            opacity: 0;
+        }
+
+        /* Der gewählte Bereich blendet gegenläufig zurück */
+        .stage.is-focused .area.is-active .layer.overlay {
+            opacity: calc(1 - var(--zurueck, 0));
+        }
+
+        .stage.is-focused .area.is-active .layer.base {
+            opacity: var(--zurueck, 0);
+        }
+
+        .info {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            justify-content: center;
+            opacity: 0;
+            transform: translateY(8px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            pointer-events: none;
+        }
+
+        .info-text {
+            width: 100%;
+            height: 100%;
+            padding: 3% 8% 64px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            font-size: 1rem;
+            line-height: 1.7;
+            color: var(--text-main);
+        }
+
+        /* Die Aussparung: ein leerer Block im Textfluss, dessen Form der Text
+           umfließt. Die Polygone geben die Fläche an, die das Motiv im
+           jeweiligen Overlay einnimmt – oben links bei „oben“, unten links
+           bei „links“, rechts in der Mitte bei „rechts“. */
+        .info-space {
+            height: 100%;
+            shape-margin: 30px;
+        }
+
+        .info-untenlinks .info-text {
+            columns: 2;
+            column-gap: 112px;
+            column-fill: auto;
+        }
+
+        /* Der Titel überspannt die Spalten, bleibt aber auf der Breite der
+           ersten stehen. Dadurch beginnen beide Spalten darunter bündig mit
+           der ersten Textzeile, statt dass die rechte auf Höhe der
+           Überschrift ansetzt. */
+        .info-untenlinks .info-text h2 {
+            column-span: all;
+            width: calc(50% - 56px);
+        }
+
+        .info-untenlinks .info-space {
+            float: left;
+            width: 100%;
+            height: calc(100% - 50px);
+            shape-outside: polygon(0 54%, 100% 54%, 100% 100%, 0 100%);
+        }
+
+        .info-obenlinks .info-space {
+            float: none;
+            height: 52%;
+        }
+
+        .info-obenrechts .info-split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 64% auto;
+            column-gap: 68px;
+            height: 100%;
+        }
+
+        .info-obenrechts .info-col-a {
+            grid-column: 1;
+            grid-row: 1 / 3;
+        }
+
+        .info-obenrechts .info-col-b {
+            grid-column: 2;
+            grid-row: 2;
+            /* Etwas tiefer als die Grid-Zeile ansetzt, damit die erste Zeile
+               rechts auf einer Zeilenlinie mit dem linken Text sitzt. */
+            margin-top: 0.85rem;
+        }
+
+        .info-untenrechts .info-space {
+            display: none;
+        }
+
+        .info-obenlinks .info-cols,
+        .info-untenrechts .info-cols {
+            columns: 2;
+            column-gap: 68px;
+        }
+
+        .info-obenlinks .info-cols h2,
+        .info-untenrechts .info-cols h2 {
+            column-span: all;
+            width: calc(50% - 34px);
+        }
+
+        /* Erzwungener Spaltenwechsel: Der Absatz davor bleibt so geschlossen in
+           der linken Spalte, statt über die Spaltengrenze zu brechen – die
+           rechte Spalte beginnt erst mit dieser Unterüberschrift. Ohne den
+           oberen Abstand sitzt sie auf der Höhe der ersten Textzeile links. */
+        .info-untenrechts .info-cols .spaltenwechsel {
+            break-before: column;
+            margin-top: 0;
+        }
+
+        .info h2 {
+            font-family: var(--font-head);
+            font-size: 1.3rem;
+            font-weight: 600;
+            line-height: 1.25;
+            margin-bottom: 20px;
+        }
+
+        .info p {
+            margin-bottom: 12px;
+        }
+
+
+        .info h3 {
+            font-family: var(--font-head);
+            font-size: 1rem;
+            font-weight: 600;
+            line-height: 1.35;
+            color: var(--text-main);
+            margin: 16px 0 6px;
+        }
+
+        .info h2 + h3 {
+            margin-top: 0;
+        }
+
+        /* Erst im eingerasteten Zustand ist der Text auch bedienbar: Passt er
+           nicht ganz auf die Fläche, lässt er sich dann scrollen. */
+        .stage.is-focused .area.is-active .info {
+            opacity: calc(1 - var(--zurueck, 0));
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        /* Fortschritt des Haltens – ohne diese Rückmeldung wartet niemand
+           lang genug, um das Einrasten überhaupt zu erleben. Eine Ecke
+           überblendet ihr Bild in die Zeichnung; das Geradehalten führt aus
+           dem Text zur Übersicht zurück und setzt dabei das Gesamtbild
+           zusammen. */
+
+        /* ── Einführungsspiel ──────────────────────────────────────────
+           Liegt nach der Kalibrierung über dem Bild und deckt es ab: Erst wird
+           die Geste geübt, dann ist der Inhalt an der Reihe. */
+        /* Startet unsichtbar und wird erst vom Skript gezeigt. Das Markup
+           steht schon in der Seite, das Modul lädt aber verzögert – ohne das
+           blitzte das Einführungsspiel zwischen dem ersten Bild der Seite und
+           dem Erscheinen der Kalibrierung kurz auf. */
+        .lehre {
+            position: absolute;
+            inset: 0;
+            z-index: 12;
+            background: var(--bg-card, #ffffff);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.6s ease;
+        }
+
+        .lehre.is-shown {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .lehre.is-gone {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .lehre-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* In der Mitte, quer über die Fläche – dort, wo der Zeiger startet und
+           wohin er zwischen den Ecken zurückkommt. */
+        /* Aussehen kommt aus der Klasse `instruction` (css/interaktion.css);
+           hier steht nur, wo die Zeile liegt. */
+        .lehre-text {
+            position: absolute;
+            left: 50%;
+            top: 12%;
+            transform: translate(-50%, -50%);
+            white-space: nowrap;
+            font-family: var(--font-head);
+            text-align: center;
+        }
+
+        /* ── Tafel nach dem Einführungsspiel ───────────────────────────
+           Zwischen Übung und Inhalt: Erst ist die Geste klar, dann die
+           Aufgabe. Die weiße Textbox selbst ist überall dieselbe – ihre Form
+           steht in css/interaktion.css (.intro-panel); hier steht nur, wie sie
+           die Fläche abdeckt und verschwindet.
+           Anders als in den anderen Stationen startet sie verdeckt: Sie kommt
+           erst nach dem Einführungsspiel, das Skript nimmt ihr das `is-gone`. */
+        .intro {
+            position: absolute;
+            inset: 0;
+            z-index: 11;
+            background: var(--bg-card);
+            transition: opacity 0.5s ease;
+        }
+
+        
+
+        .intro.is-gone {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        
+
+        /* ── Hinweis bei Inaktivität ───────────────────────────────────
+           Erscheint erst, wenn im geöffneten Text eine Weile keine Bewegung
+           mehr ankommt. Anders als im Modul „3 Bereiche“ liegt er nicht über
+           der ganzen Fläche, sondern nur am unteren Rand: Hier wird gelesen,
+           und Ruhe ist dabei keine Ratlosigkeit – ein deckender Hinweis
+           würde mitten im Satz dazwischengehen. */
+        .idle {
+            position: absolute;
+            bottom: 54px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+            z-index: 8;
+        }
+
+        .idle.is-visible {
+            opacity: 1;
+        }
+
+        .idle-box {
+            max-width: 520px;
+            padding: 14px 22px;
+            background: #ffffff;
+            border: 1px solid var(--border-card);
+            border-radius: 14px;
+            box-shadow: 0 8px 20px -6px rgba(0, 0, 0, 0.12);
+            font-size: 1rem;
+            line-height: 1.6;
+            text-align: center;
+        }
+
+        /* Lesbarkeit über der Zeichnung: An einigen Stellen überlagert die
+           schwarze Zeichnung den Text. Ein dichter weißer Schein hinter den
+           Glyphen hält die Zeichnung auf Abstand und den Text lesbar; auf der
+           weißen Fläche bleibt er unsichtbar. Die mehrfach gestapelten Schatten
+           bei kleinem Radius machen den Schein nahe der Glyphen fast deckend,
+           nach außen läuft er weich aus. text-shadow vererbt sich an
+           Überschriften und Quellenmarken mit. */
+        .info .info-text {
+            text-shadow:
+                0 0 2px #fff, 0 0 2px #fff, 0 0 2px #fff, 0 0 2px #fff,
+                0 0 4px #fff, 0 0 4px #fff, 0 0 4px #fff,
+                0 0 7px #fff;
+        }
+
+    </style>
+</head>
+
+<body>
+    <header class="topbar">
+        <div class="topbar-left">
+            <a href="/inhalte.html" class="back-btn">← Zurück</a>
+            <h1>Eintragspfade</h1>
+        </div>
+        <div class="topbar-right">
+            <button id="calBtn" class="cal-btn">Mitte kalibrieren</button>
+            <div id="connBadge" class="status-badge">
+                <div class="status-dot"></div>
+                <span id="connStatusText">Offline</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="stage is-covered" id="stage">
+        <!-- Reihenfolge von hinten nach vorn; jedes Paar aus Grundbild und
+             Overlay gehört zu einem Bereich. Die Mitte liegt ganz hinten und
+             gehört zu keiner Auswahl – sie bleibt immer so, wie sie ist. -->
+        <img class="layer" src="/img/interactionen/eintragspfade/mitte.png" alt="">
+
+        <div class="area" id="areaObenRechts">
+            <img class="layer base" src="/img/interactionen/eintragspfade/rechtsoben.png" alt="">
+            <img class="layer overlay" src="/img/interactionen/eintragspfade/overlay_rechtsoben.png" alt="">
+            <!-- PLATZHALTER – Text zum Eintragspfad hier einsetzen -->
+            <div class="info info-obenrechts">
+                <div class="info-text">
+                    <!-- Hier stehen die beiden Spalten als eigene Blöcke, die
+                         Aufteilung des Textes ist also von Hand gesetzt: Die
+                         linke läuft über die volle Höhe, die rechte beginnt
+                         unter dem Bild. Ein Spaltensatz kann das nicht – er
+                         füllt immer von oben. -->
+                    <div class="info-split">
+                        <div class="info-col-a">
+                        <h2>Atmosphärischer Transport und Ablagerung</h2>
+                        <h3>Wind als globaler Verteiler</h3>
+                        <p>Aufgrund ihrer Größe von maximal 5&#8239;mm<cite class="quelle" data-ref="hartmann-2019" data-loc="S.1043 f.">[6]</cite> 
+                            und ihrer niedrigen Dichte wird Mikroplastik extrem leicht vom Wind erfasst. 
+                            Die Partikel verbleiben nicht lokal, sondern werden von städtischen Gebieten bis in sehr abgelegene Regionen und sogar in die obere Atmosphäre transportiert&#8239;<cite class="quelle" data-ref="firouzsalari-2025" data-loc="S.2">[7]</cite>. 
+                            Klimawandelbedingte Trockenheit verstärkt diese Winderosion zusätzlich&#8239;<cite class="quelle" data-ref="veloso-2025" data-loc="S.3">[8]</cite>,&#8239;<cite class="quelle" data-ref="amer-2025" data-loc="S.9">[9]</cite>. 
+                            Der Wind wirkt dabei in beide Richtungen: Er trägt das Mikroplastik in die Böden ein, kann es aber auch wieder abtragen und weiterverteilen&#8239;<cite class="quelle" data-ref="veloso-2025" data-loc="S.12">[8]</cite>.</p>
+                        <h3>Vegetation als Partikelfalle</h3>
+                        <p>Messungen der atmosphärischen Deposition belegen, dass Bäume und Pflanzen als natürliche Auffangflächen für luftgetragenes Mikroplastik dienen&#8239;<cite class="quelle" data-ref="veloso-2025" data-loc="S.1, 6 u. 12">[8]</cite>. 
+                            Besonders an Blättern bleiben die Partikel durch deren wachsartige Oberfläche (Epikutikularwachsschicht) stark haften&#8239;<cite class="quelle" data-ref="weber-bigalke-2025" data-loc="S.4">[10]</cite>. 
+                            Fällt das Laub zu Boden und zersetzt sich, wird das Plastik beständig in tiefere Bodenschichten verlagert&#8239;<cite class="quelle" data-ref="weber-bigalke-2025" data-loc="S.4">[10]</cite>. 
+                            Hierbei zeigen sich saisonale Unterschiede: Laubwälder weisen nach dem herbstlichen Blattabfall hohe Eintragsraten auf, 
+                            während die Belastung in Nadelwäldern konstant bleibt&#8239;<cite class="quelle" data-ref="weber-bigalke-2025" data-loc="S.5">[10]</cite>.</p>
+                        <h3>Anthropogene Einflüsse und Straßenverkehr</h3>
+                        <p>Der atmosphärische Eintrag wird stark durch menschliche Aktivitäten bestimmt.
+                            Vor allem der Straßenverkehr befördert Partikel in die Luft – etwa durch die Fragmentierung größerer Plastikteile,
+                            den Verschleiß von Straßenmarkierungen oder durch kunststoffmodifizierten Asphalt&#8239;<cite class="quelle" data-ref="amer-2025" data-loc="S.3955">[9]</cite>.</p>
+                        </div>
+
+                        <div class="info-col-b">
+                        <p>Diese sekundären Mikroplastikpartikel lagern sich als Staub am Boden ab und werden durch Wind oder vorbeifahrende Autos immer wieder neu aufgewirbelt&#8239;<cite class="quelle" data-ref="amer-2025" data-loc="S.3955">[9]</cite>.
+                            Zusammenfassend fungiert die Atmosphäre als zentrale Verteilungszone, in der natürliche Gegebenheiten (Wind, Vegetation)
+                            und menschliche Aktivitäten (Verkehr) eng zusammenwirken und für eine großräumige Verbreitung von Mikroplastik sorgen.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="area" id="areaObenLinks">
+            <img class="layer base" src="/img/interactionen/eintragspfade/linksoben.png" alt="">
+            <img class="layer overlay" src="/img/interactionen/eintragspfade/overlay_linksoben.png" alt="">
+            <!-- PLATZHALTER – Text zum Eintragspfad hier einsetzen -->
+            <div class="info info-obenlinks">
+                <div class="info-text">
+                    <div class="info-space"></div>
+                    <div class="info-cols">
+                    <h2>Anthropogene Einträge</h2>
+                    <p>Die Anreicherung von Kunststoffpartikeln in der Umwelt ist maßgeblich auf menschliche (anthropogene) Einflüsse zurückzuführen. 
+                        Eine Hauptursache ist dabei die unsachgemäße Entsorgung von Kunststoffprodukten am Ende ihrer Nutzungsdauer&#8239;<cite class="quelle" data-ref="ahmad-2025" data-loc="S.1">[11]</cite>.</p>
+                    <h3>Einfluss des alltäglichen Konsums</h3>
+                    <p>Der anthropogene Eintrag von Plastik ist eng mit alltäglichen Konsumgewohnheiten verknüpft. 
+                        Zu den potenziellen Quellen gehören Alltagsgegenstände wie Körperpflegeprodukte, synthetische Kleidung, Lebensmittelbehälter und Plastiktüten sowie Reifen und Straßenmarkierungen. 
+                        Diese Problematik belegt unter anderem eine Studie aus Südindien: Dort wurden die Kunststoffe Polyethylen (PE), Polyamid (PA) und Polypropylen (PP) in Wohngebieten nachgewiesen, 
+                        wobei sich speziell PE signifikant in der Nähe von Mülldeponien und auf landwirtschaftlichen Flächen anreicherte&#8239;<cite class="quelle" data-ref="rathikannu-2025" data-loc="S.1 u. 7">[4]</cite>.</p>
+                    <h3>Der Sonderfall Reifenabrieb</h3>
+                    <p>Eine spezifische, verkehrsbedingte Eintragsquelle in urbanen und ländlichen Räumen ist der Reifenabrieb. 
+                        Die durch das Verkehrsaufkommen entstehenden Partikel verbreiten sich über den Wind oder werden durch Niederschläge (Oberflächenabfluss) in Abwassersysteme und Gewässer gespült. 
+                        In der Wissenschaft wurde dieser Faktor lange Zeit vernachlässigt, da Reifenabrieb aufgrund seines hohen Gummianteils anfangs nicht eindeutig als Kunststoff eingeordnet wurde&#8239;<cite class="quelle" data-ref="bostrom-2025" data-loc="S.6">[12]</cite>.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="area" id="areaUntenLinks">
+            <img class="layer base" src="/img/interactionen/eintragspfade/linksunten.png" alt="">
+            <img class="layer overlay" src="/img/interactionen/eintragspfade/overlay_linksunten.png" alt="">
+            <div class="info info-untenlinks">
+                <div class="info-text">
+                <h2>Landwirtschaftliche Einträge</h2>
+                <!-- Die Aussparung steht hinter dem Titel, weil dieser die
+                     Spalten überspannt: Alles davor bildet eine eigene
+                     Spaltengruppe, dort wirkte der Umfluss nicht mehr. -->
+                <div class="info-space"></div>
+                <p>Die Belastung agrarwirtschaftlich genutzter Böden mit Mikroplastik resultiert aus einer Kombination von bewusst eingesetzten Materialien und unbeabsichtigten Einträgen. 
+                    In der Fachliteratur wird dabei systematisch zwischen direkten und indirekten Eintragsquellen unterschieden.</p>
+                <h3>Direkte Eintragsquellen</h3>
+                <p>Diese umfassen Kunststoffe, die gezielt in der Landwirtschaft genutzt werden und somit unmittelbar in den Boden gelangen. 
+                    Dazu zählen primär Mulch- und Abdeckfolien, Bauteile von Gewächshäusern, polymerbeschichtete Pflanzenschutzmittel sowie Silofolien, Säcke und Schalen&#8239;<cite class="quelle" data-ref="wu-2025" data-loc="S.2">[13]</cite>.</p>
+                <h3>Indirekte Eintragsquellen</h3>
+                <p>Hierbei gelangen Kunststoffe über Umwege in die Umwelt und reichern sich dort unbeabsichtigt an. 
+                    Zu den Hauptverursachern gehören die Nutzung von Klärschlamm und organischem Dünger, Abwasser aus Bewässerungsanlagen, der mechanische Verschleiß von Landmaschinen sowie die atmosphärische Deposition&#8239;<cite class="quelle" data-ref="wu-2025" data-loc="S.2">[13]</cite>.</p>
+                <h3>Ursachen der indirekten Verunreinigung</h3>
+                <p>Selbst natürliche, organische Düngemittel weisen häufig Mikroplastikverunreinigungen auf. 
+                    Diese entstehen unter anderem durch belastetes Abwasser, atmosphärische Einträge oder eine unsachgemäße Entsorgung von Kunststoffabfällen&#8239;<cite class="quelle" data-ref="nair-2025" data-loc="S.7 ff.">[14]</cite>. 
+                    Weitere signifikante Quellen sind Textilien, Körperpflegeprodukte und industrielle Prozesse. Deren Partikel gelangen hauptsächlich über Abwassereinleitungen,
+                    die Textilproduktion und den stetigen Zerfall größerer Kunststoffteile in den Boden&#8239;<cite class="quelle" data-ref="rathikannu-2025" data-loc="S.8">[4]</cite>.</p>
+                </div>
+            </div>
+        </div>
+        <div class="area" id="areaUntenRechts">
+            <img class="layer base" src="/img/interactionen/eintragspfade/rechtsunten.png" alt="">
+            <img class="layer overlay" src="/img/interactionen/eintragspfade/overlay_rechtsunten.png" alt="">
+            <!-- PLATZHALTER – Text zum Eintragspfad hier einsetzen -->
+            <div class="info info-untenrechts">
+                <div class="info-text">
+                    <div class="info-cols">
+                    <h2>Industrielle Einträge</h2>
+                    <p>Der Nachweis von Mikroplastik in tieferen Bodenschichten zeigt, dass es sich nicht nur um ein aktuelles, sondern um ein historisch gewachsenes Umweltproblem handelt.
+                        Mit der zunehmenden Industrialisierung stieg der Kunststoffverbrauch in Bereichen wie Infrastruktur, Mode, Haushalt und durch den Zweiten Weltkrieg massiv an&#8239;<cite class="quelle" data-ref="wu-2025" data-loc="S.2">[13]</cite>. 
+                        Dieser jahrzehntelange, stetige Anstieg der Mikroplastikkonzentration in der Umwelt lässt sich in wissenschaftlichen Studien deutlich nachweisen&#8239;<cite class="quelle" data-ref="wu-2025" data-loc="S.3">[13]</cite>.</p>
+                    <h3>Industrielle Emissionen und Abwasser</h3>
+                    <p>Bei der industriellen Herstellung, Verarbeitung und Nutzung von Kunststoffen entstehen Emissionen, die unbeabsichtigt in verschiedene Umweltkompartimente gelangen&#8239;<cite class="quelle" data-ref="wu-2025" data-loc="S.2">[13]</cite>. 
+                        Ein zentraler Transportweg, über den dieses Mikroplastik schließlich in die Böden gelangt, ist das Abwassersystem.</p>
+                    <h3 class="spaltenwechsel">Der Verlagerungseffekt durch Klärschlamm</h3>
+                    <p>In das Abwasser gelangen täglich unzählige Partikel, beispielsweise aus industriellen Prozessen, Kosmetika oder Waschmitteln. 
+                        Moderne Kläranlagen filtern dieses Mikroplastik mit einer hohen Effizienz von 50 % bis über 99 % aus dem Wasser heraus. 
+                        Das Problem: Die Partikel werden dadurch im entstehenden Klärschlamm gebunden&#8239;<cite class="quelle" data-ref="veloso-2025" data-loc="S.3">[8]</cite>. 
+                        Da dieser Klärschlamm anschließend häufig als Dünger auf landwirtschaftlichen Flächen ausgebracht wird, 
+                        verlagert sich die Mikroplastikbelastung direkt vom Abwassersystem in das terrestrische Ökosystem&#8239;<cite class="quelle" data-ref="bostrom-2025" data-loc="S.6">[12]</cite>.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="idle" id="idle">
+            <div class="idle-box instruction">
+                Halte das Gerät wieder gerade, um zurück zum Gesamtbild zu kommen.
+            </div>
+        </div>
+
+        <!-- Einführungsspiel: steht nach der Kalibrierung vor dem Inhalt und
+             erklärt die Geste, indem es sie einmal verlangt. -->
+        <div class="lehre" id="lehre">
+            <canvas class="lehre-canvas" id="lehreCanvas"></canvas>
+            <p class="lehre-text instruction" id="lehreText">Neige in jede Ecke und halte sie kurz</p>
+        </div>
+
+        <!-- Tafel zwischen Übung und Inhalt: der deckende Rahmen wie in den
+             anderen Stationen, darin die immer gleiche weiße Textbox. Startet
+             verdeckt (is-gone) und wird erst nach dem Einführungsspiel gezeigt. -->
+        <div class="intro is-gone" id="intro">
+            <div class="intro-panel">
+            <h2>Woher stammt das Mikroplastik in den Böden?</h2>
+            <p>Mikroplastik durchdringt unsere Böden in Form winziger Partikel. 
+                Der eigentliche Eintrag in terrestrische Systeme, und die Frage, 
+                welche menschlichen Prozesse dabei die Hauptrolle spielen, 
+                bildet den Ausgangspunkt für alle weiteren Vorgänge im Bodenökosystem 
+                und steht daher im Zentrum der aktuellen Forschung.</p>
+            <p>In der Forschung wird grundlegend zwischen natürlichen und anthropogenen Quellen von Mikroplastik differenziert&#8239;<cite class="quelle" data-ref="ahmad-2025" data-loc="S.1">[11]</cite>. 
+                Die Einträge, die zur Kontamination der Umwelt führen, stammen primär aus menschlichen Aktivitäten, Industrie und Landwirtschaft&#8239;<cite class="quelle" data-ref="rathikannu-2025" data-loc="S.11">[4]</cite>,&#8239;<cite class="quelle" data-ref="ahmad-2025" data-loc="S.1">[11]</cite>. </p>
+            <p> Ergänzt werden diese anthropogenen Quellen durch die Atmosphäre, 
+                die aufgewirbelte Staub- und Abriebpartikel aus all diesen Bereichen als Schwebstoffe in die Luft aufnimmt&#8239;<cite class="quelle" data-ref="amer-2025" data-loc="S.3955">[9]</cite>.</p>
+            <p class="intro-note instruction">schütteln zum starten</p>
+            </div>
+        </div>
+    </main>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="/js/interactions/inhalte/eintragspfade.js"></script>
+    <script type="module" src="/js/interactions/inhalte/quellen-init.js"></script>
+</body>
+
+</html>

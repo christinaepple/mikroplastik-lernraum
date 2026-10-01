@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sucher</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inclusive+Sans:wght@300..700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/interaktion.css">
+
+    <style>
+        :root {
+            --ink: #0f172a;
+            --muted: #64748b;
+            --border: #e2e8f0;
+            --font-text: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            /* Breite eines abgelegten Stationsbildes */
+            --piece: min(300px, 22vw);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            /* Ein weißes Blatt Papier: hier wird collagiert. */
+            background: #fff;
+            color: var(--ink);
+            font-family: var(--font-text);
+            overflow: hidden;
+            cursor: none;
+        }
+
+        /* Zurück-Knopf dezent oben links */
+        .back-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: #fff;
+            color: var(--ink);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            z-index: 20;
+        }
+
+        /* QR-Karte, zentriert; verschwindet, sobald der Sucher am Handy läuft. */
+        .connect {
+            position: fixed;
+            inset: 0;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            background: #fff;
+            transition: opacity 0.6s ease;
+        }
+
+        .connect.is-hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .qr {
+            width: 240px;
+            height: 240px;
+            border-radius: 16px;
+            padding: 12px;
+            background: #fff;
+            border: 1px solid var(--border);
+        }
+
+        .qr img {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .connect p {
+            font-size: 0.95rem;
+            color: var(--muted);
+        }
+
+        /* ── Die Collage ───────────────────────────────────────────────────
+           Abgelegte Stationsbilder, frei auf dem Blatt verteilt. */
+        .sheet {
+            position: fixed;
+            inset: 0;
+        }
+
+        .sheet[hidden] {
+            display: none;
+        }
+
+        .piece {
+            --selection-progress: 0;
+            position: absolute;
+            width: var(--piece);
+            transform: translate(-50%, -50%) scale(1);
+            /* Noch nicht betreten: das Bild liegt erst als Entwurf auf dem
+               Blatt. Nach der Station steht es in voller Farbe. */
+            opacity: 1; /* Test: alle Key-Visuals farbig (sonst 0.45, bis Station done) */
+            transition: opacity 0.6s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .piece.is-dropping {
+            transform: translate(-50%, -50%) scale(1.35);
+            opacity: 0;
+        }
+
+        .piece.done {
+            opacity: 1;
+        }
+
+        /* Ein Bild besteht aus zwei Lagen: dem Foto und – falls vorhanden – der
+           Umrissskizze darüber. Das Foto bildet die Höhe (im Fluss), die Skizze
+           liegt deckungsgleich darauf. */
+        .piece img {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        /* Auswahl-Blend beim Halten: das Foto löst sich in die Zeichnung auf,
+           gesteuert über --selection-progress (setzt sucher.js) — dieselbe
+           Handschrift wie die Szenenwahl in eintragspfade-2. Kein transition auf
+           der Deckkraft: Die Weichheit kommt aus dem Haltefortschritt selbst,
+           ein zusätzlicher Übergang würde nur doppelt glätten und schmieren. */
+        .piece-base {
+            opacity: calc(1 - var(--selection-progress));
+        }
+
+        .piece-stroke {
+            position: absolute;
+            top: 0;
+            left: 0;
+            opacity: var(--selection-progress);
+        }
+
+        /* Das getragene Bild. Es wandert mit dem Zeiger vom Handy herüber und
+           hängt hier an ihm, bis es abgelegt wird. Der trägere Übergang als
+           beim Cursor gibt ihm Gewicht — es zieht spürbar nach. */
+        .carried {
+            position: fixed;
+            width: var(--piece);
+            height: auto;
+            margin: 0;
+            pointer-events: none;
+            z-index: 11;
+            opacity: 0.85;
+            transform: translate(-50%, -50%) scale(1);
+            transition: left 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+                top 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+                opacity 0.25s ease, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .carried[hidden] {
+            display: none;
+        }
+
+        /* Beim Herüberwechseln kurz größer und blasser: es kommt an. */
+        .carried.is-arriving {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(1.3);
+        }
+
+        /* Sucher-Cursor: die Hand aus dem Einstieg, wie auf dem Handy. */
+        .cursor {
+            position: fixed;
+            width: 80px;
+            height: 80px;
+            margin: -40px 0 0 -40px;
+            pointer-events: none;
+            z-index: 12;
+            opacity: 0;
+            transition: left 0.16s ease-out, top 0.16s ease-out, opacity 0.2s ease;
+        }
+
+        .cursor.is-on {
+            opacity: 1;
+        }
+
+        .cursor-hand {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 56px;
+            height: auto;
+            transform: translate(-50%, -50%);
+        }
+
+        .cursor-ring {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #cursorProgress {
+            transition: stroke-dasharray 0.1s linear;
+        }
+
+        /* Die wenigen Hinweise, die das Blatt trägt. */
+        .hint {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 40px;
+            text-align: center;
+            font-size: 1.05rem;
+            font-weight: 400;
+            color: var(--accent);
+            text-transform: lowercase;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 13;
+        }
+
+        .hint.is-on {
+            opacity: 1;
+        }
+
+        /* Rahmen der laufenden Station: deckt das Blatt komplett ab. */
+        .station {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+            background: #fff;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            z-index: 15;
+        }
+
+        .station[hidden] {
+            display: none;
+        }
+
+    </style>
+</head>
+
+<body>
+    <a href="/einstieg.html" class="back-btn">← Einstieg</a>
+
+    <div class="sheet" id="sheet" hidden></div>
+
+    <img class="carried" id="carried" alt="" hidden>
+
+    <p class="hint" id="hint"></p>
+
+    <!-- Hand-Cursor: offen (drop) im freien Zustand, geschlossen (drag) sobald ein
+         Keyvisual getragen wird. sucher.js tauscht die Quelle. -->
+    <div class="cursor" id="cursor" aria-hidden="true">
+        <img class="cursor-hand" id="cursorHand" src="/img/interactionen/einstieg/cursor_drop.png" alt="">
+        <!-- Halte-Fortschritt: füllt sich beim Ablegen, sobald ruhig gehalten wird. -->
+        <svg class="cursor-ring" viewBox="0 0 48 48">
+            <circle id="cursorProgress" cx="24" cy="24" r="21" fill="none" stroke="var(--accent)"
+                stroke-width="3" stroke-linecap="round" stroke-dasharray="0 1000"
+                transform="rotate(-90 24 24)" />
+        </svg>
+    </div>
+
+    <iframe class="station" id="station" hidden title="Station"></iframe>
+
+    <div class="connect" id="connect">
+        <div class="qr"><img id="qrImage" src="" alt="QR-Code"></div>
+        <p>Scanne den Code, um den Sucher auf dem Handy zu öffnen</p>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="/js/sucher.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3 Bereiche (Inhalte) - Labor</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inclusive+Sans:wght@300..700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="/css/interaktion.css">
+
+    <style>
+        :root {
+            --bg-light: #f8fafc;
+            --bg-card: #ffffff;
+            --border-card: #e2e8f0;
+            --primary: #2563eb;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+
+            --bucket-grey: #cbd5e1;
+            --bucket-grey-active: #94a3b8;
+
+            --item-h: 120px; /* Höhe der fallenden/gestapelten Bilder */
+
+            /* Eine Schrift für alles: Inclusive Sans ist auf Lesbarkeit hin
+               gezeichnet – offene Punzen, deutlich unterscheidbares I/l/1.
+               Überschrift und Fließtext trennt allein das Gewicht, 600
+               gegen 400. Dieselbe Paarung wie in den übrigen
+               Inhalts-Stationen. */
+            --font-head: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            --font-text: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        /* Das Modul füllt das Fenster; ein begrenzender Rand um die Fläche
+           kostet nur Platz – dieselbe Entscheidung wie beim eingebetteten
+           Modul in der Landkarte. */
+        body {
+            font-family: var(--font-text);
+            font-weight: 400;
+            line-height: 1.5;
+            background-color: var(--bg-card);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Kopfleiste mit fester Höhe – nur so ist die Fläche, die dem Spiel
+           bleibt, im Voraus bekannt. */
+        header {
+            flex: none;
+            height: 64px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 24px;
+            padding: 0 28px;
+            border-bottom: 1px solid var(--border-card);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            color: var(--text-main);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .back-btn:hover {
+            background: #f1f5f9;
+            transform: translateX(-4px);
+        }
+
+        h1 {
+            font-family: var(--font-head);
+            font-size: 1.15rem;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .cal-btn {
+            padding: 10px 20px;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            /* Schaltflächen erben die Schrift nicht von selbst – ohne diese
+               Zeile setzt der Browser sie in seiner eigenen Systemschrift. */
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .cal-btn:hover {
+            background: #f1f5f9;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            /* Versalien in dieser Größe brauchen etwas mehr Gewicht als der
+               Fließtext, sonst wirken sie ausgebleicht. */
+            font-weight: 500;
+            text-transform: uppercase;
+            background: rgba(220, 38, 38, 0.1);
+            color: #dc2626;
+        }
+
+        .status-badge.connected {
+            background: rgba(22, 163, 74, 0.1);
+            color: #16a34a;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: currentColor;
+        }
+
+        /* Game Workspace */
+        .workspace {
+            position: relative;
+            background: var(--bg-card);
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Game UI – Zähler in der Arbeitsfläche, damit er auch beim Einbetten
+           sichtbar bleibt: die einbettende Seite blendet nur header/footer aus */
+        .score-board {
+            position: absolute;
+            top: 20px;
+            left: 30px;
+            font-family: var(--font-head);
+            font-size: 1.6rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            z-index: 10;
+        }
+
+        .score-val {
+            color: var(--text-main);
+        }
+
+        /* Fallendes Bild */
+        #playerItem {
+            position: absolute;
+            height: var(--item-h);
+            width: auto;
+            max-width: 28%;
+            object-fit: contain;
+            top: 0;
+            left: 50%; /* center default */
+            transform: translateX(-50%);
+            filter: drop-shadow(0 4px 12px rgba(0,0,0,0.15));
+            transition: left 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+            z-index: 5;
+        }
+
+        /* Buckets at the bottom – erscheinen erst nach dem Haupttext */
+        .buckets-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .buckets-container.visible {
+            opacity: 1;
+        }
+
+        .bucket {
+            flex: 1;
+            display: flex;
+            flex-direction: column-reverse;
+            justify-content: flex-start;
+            align-items: center;
+            padding-bottom: 20px;
+            transition: transform 0.2s;
+        }
+
+        .bucket-inner {
+            width: 80%;
+            height: 12px;
+            border-radius: 12px 12px 0 0;
+            background: var(--bucket-grey);
+            transition: height 0.2s ease, background 0.2s;
+            flex-shrink: 0;
+            z-index: 1;
+        }
+
+        /* Angesteuert trägt den Akzent: Er gehört in der ganzen Ausstellung
+           dem, was gerade von der eigenen Bewegung abhängt. */
+        .bucket.active .bucket-inner {
+            height: 20px;
+            background: var(--accent);
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.15);
+        }
+
+        /* Begriff unter der grauen Fläche */
+        .bucket-label {
+            width: 80%;
+            padding-top: 10px;
+            text-align: center;
+            font-size: 1.25rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            transition: color 0.2s;
+            flex-shrink: 0;
+        }
+
+        /* Der Begriff färbt sich mit seiner Fläche: Auswahl ist eine Sache,
+           nicht zwei. */
+        .bucket.active .bucket-label {
+            color: var(--accent);
+        }
+
+        .stacked-item {
+            height: var(--item-h);
+            width: auto;
+            max-width: 80%;
+            object-fit: contain;
+            flex-shrink: 0;
+            /* Abstand zum darunterliegenden Objekt; muss zu STACK_GAP im JS
+               passen (negativ wäre Überlappung) */
+            margin-bottom: 8px;
+            z-index: 2;
+            filter: drop-shadow(0 -2px 8px rgba(0,0,0,0.12));
+        }
+
+
+
+        /* ── Vorbereitungs-Schritt: Bereiche erkunden ─────────────────── */
+        .intro-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            pointer-events: none;
+            z-index: 6;
+        }
+
+        .intro-col {
+            flex: 1;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            /* Schmaler als die Spur und mit Abstand über den Flächen: Der Text
+               gehört zum Begriff darunter, soll ihn aber nicht bedrängen. */
+            padding: 0 56px 180px;
+        }
+
+        .intro-box {
+            background: #ffffff;
+            border: 1px solid var(--border-card);
+            border-radius: 16px;
+            padding: 20px 22px;
+            font-size: 0.95rem;
+            line-height: 1.7;
+            color: var(--text-main);
+            text-align: left;
+            box-shadow: 0 8px 20px -6px rgba(0, 0, 0, 0.12);
+            opacity: 0;
+            transform: translateY(8px);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+
+        .intro-col.active .intro-box {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Form und Textsatz kommen aus css/interaktion.css (.intro-panel).
+           Hier bleibt nur, was diese Station angeht: Die Box liegt über den
+           Bereichen und ihren Erklärtexten. */
+        #introMain {
+            z-index: 7;
+        }
+
+        /* Erscheint erst, wenn alle drei Kategorien einmal gelesen wurden –
+           vorher wäre das Starten ein Angebot, den Inhalt zu überspringen. */
+        .areas-note {
+            position: absolute;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            font-family: var(--font-head);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            z-index: 8;
+        }
+
+        .areas-note.is-visible {
+            opacity: 1;
+        }
+
+        /* ── Einführungsspiel ──────────────────────────────────────────
+           Vor allem Inhaltlichen steht die Bewegung: dreimal in eine Fläche
+           neigen und sie kurz halten. Die Übung verlangt genau das, was die
+           Station später verlangt – dieselbe Schwelle, dieselben drei Felder,
+           nur ohne Begriffe. Wer sie hinter sich hat, hat die Bedienung
+           verstanden, ohne dass sie beschrieben werden müsste.
+
+           Der letzte Schritt führt zurück in die Mitte. Er zeigt, dass die
+           Mitte eine eigene Auswahl ist und nicht bloß "nicht geneigt", und
+           er entlässt in die Ruhelage, aus der das Spiel beginnt. */
+        .tutorial {
+            position: absolute;
+            inset: 0;
+            z-index: 30;
+            background: var(--bg-card);
+            transition: opacity 0.6s ease;
+        }
+
+        /* Bis die Kalibrierung durch ist, ist die Übung zwar da, aber
+           unsichtbar: Das Kalibrier-Overlay zeigt sich erst, wenn der
+           Controller-Status bekannt ist – bis dahin blitzte hier sonst die
+           Übung auf. Ohne Übergang, damit sie danach schlicht dasteht und
+           nicht der Einführungstext durch sie hindurchscheint. */
+        .tutorial.is-pending {
+            opacity: 0;
+            transition: none;
+        }
+
+        .tutorial.is-gone {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Der Übungszeiger: derselbe Punkt wie in den Eintragspfaden, damit
+           die Übungen der Ausstellung sich untereinander gleichen. Er bleibt
+           die ganze Übung über stehen und folgt nur der Neigung – aus ihm
+           entsteht bei jedem Schritt ein neuer Punkt, der ins Feld fällt. */
+        .tut-dot,
+        .tut-fall,
+        .tut-landed {
+            position: absolute;
+            width: 56px; /* muss zu TUT_DOT im Skript passen */
+            height: auto;
+            transform: translateX(-50%);
+            z-index: 2;
+        }
+
+        .tut-dot {
+            top: 160px;
+            left: 50%;
+            transition: left 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        /* Aufbau wie die Flächen der Station – nur ohne Unterschriften. */
+        .tut-fields {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+        }
+
+        .tut-field {
+            flex: 1;
+            display: flex;
+            flex-direction: column-reverse;
+            justify-content: flex-start;
+            align-items: center;
+            padding-bottom: 20px;
+        }
+
+        .tut-bar {
+            width: 80%;
+            height: 12px;
+            border-radius: 12px 12px 0 0;
+            background: var(--bucket-grey);
+            transition: height 0.2s ease, background 0.2s;
+            flex-shrink: 0;
+        }
+
+        /* Angesteuert: dieselbe Rückmeldung wie im Spiel. */
+        .tut-field.is-active .tut-bar {
+            height: 20px;
+            background: var(--bucket-grey-active);
+            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Gesucht: der Akzent gehört der Bewegung, die gerade verlangt wird.
+           Die Regel steht nach `is-active`, damit ein Feld, das beides ist,
+           die Farbe des Ziels behält und die Höhe der Auswahl. */
+        .tut-field.is-target .tut-bar {
+            background: var(--accent);
+        }
+
+        .tut-move {
+            position: absolute;
+            top: 12%;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            font-family: var(--font-head);
+        }
+
+        /* ── Hinweis bei Inaktivität ───────────────────────────────────
+           Erscheint erst, wenn eine Weile nichts passiert: Wer weiß, wie es
+           weitergeht, soll ihn nie zu sehen bekommen. */
+        .idle-overlay {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(248, 250, 252, 0.88);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+            z-index: 60;
+        }
+
+        .idle-overlay.visible {
+            opacity: 1;
+        }
+
+        .idle-box {
+            max-width: 520px;
+            padding: 28px 32px;
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 8px 20px -6px rgba(0, 0, 0, 0.12);
+            text-align: left;
+            font-size: 1.1rem;
+            line-height: 1.7;
+            color: var(--text-main);
+        }
+
+        /* Rückmeldung richtig/falsch – liegt über der ganzen Seite, nicht mehr
+           im Rahmen der Arbeitsfläche */
+        .flash {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 50;
+        }
+
+        .flash.ok {
+            box-shadow: inset 0 0 140px rgba(22, 163, 74, 0.45);
+            opacity: 1;
+        }
+
+        .flash.bad {
+            box-shadow: inset 0 0 140px rgba(220, 38, 38, 0.45);
+            opacity: 1;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="header-left">
+            <a href="/inhalte.html" class="back-btn">← Zurück</a>
+            <h1>Polymere zuordnen (Neigen)</h1>
+        </div>
+        <div class="header-actions">
+            <button id="calBtn" class="cal-btn">Mitte kalibrieren</button>
+            <div id="connBadge" class="status-badge">
+                <div class="status-dot"></div>
+                <span id="connStatusText">Offline</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="workspace" id="gameWorkspace">
+        <!-- Zähler – erscheint erst mit dem Start des Spiels -->
+        <div class="score-board hidden" id="scoreBoard">
+            <span class="score-val" id="correctEl">0</span>/<span id="totalEl">0</span>
+        </div>
+
+        <!-- Vorbereitung: Einführungstext, Schütteln führt weiter -->
+        <div class="intro-panel hidden" id="introMain">
+            <h2>Ist Plastik eigentlich gleich Plastik?</h2>
+            <p>Um das Problem Mikroplastik zu verstehen, ist eine genaue Unterscheidung der Begriffe notwendig.</p>
+            <p>Im allgemeinen Sprachgebrauch werden Kunststoff oder Plastik oft für „künstliche […],
+                also nicht natürlicherweise in der Umwelt vorkommende [...] Materialien“&#8239;<cite class="quelle" data-ref="hengstmann-tamminga-2022" data-loc="S.1">[2]</cite> verwendet.
+                Wissenschaftlich muss man jedoch zwischen Plastik und Polymeren unterscheiden.</p>
+            <p>Der Begriff Polymer leitet sich aus dem Griechischen ab poly = viel,<br>meros = Teil.
+                Das bedeutet, „dass sich Polymere aus sich wiederholenden Einzelteilen, den sogenannten Monomeren (mono = ein oder einzeln), zusammensetzen“&#8239;<cite class="quelle" data-ref="hengstmann-tamminga-2022" data-loc="S.1">[2]</cite>.
+                Nicht jedes Polymer ist automatisch Plastik. Polymere können auch natürlichen Ursprungs sein, wie zum Beispiel Stärke&#8239;<cite class="quelle" data-ref="hengstmann-tamminga-2022" data-loc="S.2">[2]</cite>.</p>
+            <p>Man teilt sie daher in drei Kategorien ein:</p>
+            <ul>
+                <li>Natürliche Polymere</li>
+                <li>Synthetische Polymere</li>
+                <li>Halbsynthetische Polymere</li>
+            </ul>
+            <p class="intro-note instruction">schütteln zum starten</p>
+        </div>
+
+        <p class="areas-note instruction" id="areasNote">schütteln zum starten</p>
+
+        <div class="intro-layer" id="introLayer">
+            <div class="intro-col" id="introLeft">
+                <div class="intro-box">
+                    Gewonnen aus natürlichen Quellen 
+                    (z. B. Stärke und Keratin)
+                </div>
+            </div>
+            <div class="intro-col" id="introMiddle">
+                <div class="intro-box">
+                    Vollständig künstlich aus fossilen Rohstoffen wie,
+                    Erdöl und Erdgas hergestellt
+                </div>
+            </div>
+            <div class="intro-col" id="introRight">
+                <div class="intro-box">
+                    Aus natürlich vorkommenden Monomeren oder chemisch modifizierten
+                    natürlichen Polymeren hergestellt
+                </div>
+            </div>
+        </div>
+
+        <!-- Fallendes Bild -->
+        <img id="playerItem" class="hidden" src="/img/interactionen/tetris/mitte1.png" alt="">
+
+        <!-- Buckets: Label unten, darüber die graue Fläche, darüber der Stapel -->
+        <div class="buckets-container" id="bucketsContainer">
+            <div class="bucket" id="bucketLeft">
+                <div class="bucket-label">Natürliche Polymere</div>
+                <div class="bucket-inner"></div>
+            </div>
+            <div class="bucket active" id="bucketMiddle">
+                <div class="bucket-label">Synthetische Polymere</div>
+                <div class="bucket-inner"></div>
+            </div>
+            <div class="bucket" id="bucketRight">
+                <div class="bucket-label">Halbsynthetische Polymere</div>
+                <div class="bucket-inner"></div>
+            </div>
+        </div>
+
+        <!-- Einführungsspiel: liegt über allem, bis die drei Felder einmal
+             angesteuert wurden -->
+        <div class="tutorial is-pending" id="tutorial">
+            <img class="tut-dot" id="tutDot" src="/img/interactionen/eintragspfade/punkt.png" alt="">
+
+            <div class="tut-fields">
+                <div class="tut-field" id="tutLeft"><div class="tut-bar"></div></div>
+                <div class="tut-field" id="tutMiddle"><div class="tut-bar"></div></div>
+                <div class="tut-field" id="tutRight"><div class="tut-bar"></div></div>
+            </div>
+
+            <!-- Der Punkt, der beim Halten aus dem Zeiger heraus ins Feld fällt -->
+            <img class="tut-fall hidden" id="tutFall" src="/img/interactionen/eintragspfade/punkt.png" alt="">
+
+            <p class="tut-move instruction" id="tutMove"></p>
+        </div>
+    </main>
+
+    <!-- Rückmeldung richtig/falsch über die ganze Seite -->
+    <div class="flash" id="flash"></div>
+
+    <!-- Hinweis bei Inaktivität, ebenfalls über die ganze Seite -->
+    <div class="idle-overlay" id="idleOverlay">
+    <div class="idle-box" id="idleText"></div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="/js/interactions/inhalte/bereiche.js"></script>
+    <script type="module" src="/js/interactions/inhalte/quellen-init.js"></script>
+</body>
+</html>
