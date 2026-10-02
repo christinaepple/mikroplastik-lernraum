@@ -33,6 +33,11 @@ export function qNorm(q) {
     return { x: q.x / l, y: q.y / l, z: q.z / l, w: q.w / l };
 }
 
+/** Die Umkehrung einer (normierten) Drehung. */
+export function qConj(q) {
+    return { x: -q.x, y: -q.y, z: -q.z, w: q.w };
+}
+
 /** Drehung um eine (normierte) Achse. */
 export function qAxis(ax, ay, az, rad) {
     const h = rad / 2, s = Math.sin(h);

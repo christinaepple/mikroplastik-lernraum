@@ -23,6 +23,9 @@ import { createLongShake } from '../../lib/shake.js';
 import { reportCompletion } from '../../lib/completion.js';
 import { initCalibration } from '../../lib/calibration.js';
 import { byId } from '../../lib/dom.js';
+import { qFromDeviceOrientation, qMul, qRotate, qConj } from '../../lib/quaternion.js';
+
+const RAD = 180 / Math.PI;
 
 const calBtn = byId('calBtn');
 const intro = byId('intro');
@@ -68,10 +71,48 @@ const gammaBase = new Baseline({ wrap: false });
 const betaBase = new Baseline({ wrap: false });
 
 // Gegen die Sprünge beim Neigen zur Seite: Nahe der Senkrechten schlägt der
-// Rohwert um. Verworfen wird das für alle Phasen gleichermaßen – sonst spränge
-// zwar die Wahl nicht mehr um, wohl aber der Zeiger im Spiel.
+// Rohwert um. Verworfen wird das für Einführung und Szenenwahl, die mit den
+// rohen Winkeln arbeiten — das Hauptspiel hat dafür mainTilt() weiter unten.
 const gammaJump = createJumpFilter();
 const betaJump = createJumpFilter();
+
+// Nullpunkt des Hauptspiel-Zeigers, als volle Gerätelage statt als rohes
+// beta/gamma — siehe mainTilt(). null = noch nicht gesetzt, wird beim
+// nächsten Sensorwert aus der aktuellen Lage gesetzt (wie Baseline.delta()).
+let qZero = null;
+let lastOrientation = null;
+
+function screenAngle() {
+    if (screen.orientation && typeof screen.orientation.angle === 'number') {
+        return screen.orientation.angle;
+    }
+    return typeof window.orientation === 'number' ? window.orientation : 0;
+}
+
+function deviceQuaternion(alpha, beta, gamma) {
+    return qFromDeviceOrientation(alpha, beta, gamma, screenAngle());
+}
+
+/**
+ * Haltung des Hauptspiel-Zeigers gegenüber dem Nullpunkt, als (dGamma, dBeta)
+ * wie gewohnt — aber aus der vollen Gerätelage (Quaternion) berechnet statt
+ * aus rohem beta/gamma. Bei starker Neigung nach unten (dorthin, wo die
+ * unteren Punkte der Schaubilder liegen) geraten die rohen Winkel in den
+ * Gimbal Lock: beta nähert sich 90°, und gamma kann dabei unvermittelt
+ * umschlagen — der Zeiger sprang dadurch an den Rand. Die Drehung gegenüber
+ * dem Nullpunkt bleibt dagegen überall stetig (dieselbe Überlegung wie beim
+ * Sucher, lib/quaternion.js).
+ */
+function mainTilt(alpha, beta, gamma) {
+    const q = deviceQuaternion(alpha, beta, gamma);
+    if (!qZero) qZero = q;
+
+    const rel = qMul(qConj(qZero), q);
+    const f = qRotate(rel, 0, 0, -1);
+    const dGamma = -Math.atan2(f.x, -f.z) * RAD;
+    const dBeta = Math.asin(clamp(f.y, -1, 1)) * RAD;
+    return { dGamma, dBeta };
+}
 
 // Kurze Sperre nach dem Laden: Wer die Station durch eine Bewegung betritt,
 // bringt diese noch mit – sie soll nicht sofort den Zeiger verreißen und vor
@@ -101,6 +142,13 @@ const connection = initConnectionBadge();
 function calibrate() {
     gammaBase.reset(); // der nächste Sensorwert setzt den Nullpunkt neu
     betaBase.reset();
+    // Die beiden Szenen steuern den Zeiger über die volle Gerätelage. Den
+    // Quaternion-Nullpunkt direkt aus dem letzten Messwert setzen, damit die
+    // Kalibrierung sofort wirkt und nicht von einem späteren Sensorpaket
+    // abhängt.
+    qZero = lastOrientation
+        ? deviceQuaternion(lastOrientation.alpha, lastOrientation.beta, lastOrientation.gamma)
+        : null;
     isCursorPlaced = false;
     gammaJump.reset(); // sonst gälte die neue Haltung selbst als Sprung
     betaJump.reset();
@@ -143,12 +191,24 @@ function revealIntro() {
 socket.on('sensorData', (data) => {
     if (!inputReady) return;
 
+    const alpha = data.alpha !== null ? data.alpha : 0;
     const gamma = data.gamma !== null ? data.gamma : 0;
     const beta = data.beta !== null ? data.beta : 0;
+    lastOrientation = { alpha, beta, gamma };
 
     // Vor allem anderen steht die Kalibrierung; erst danach nimmt die Station
     // die Neigung als Eingabe.
     if (calibration.isActive()) return;
+
+    // Das Hauptspiel wertet die volle Gerätelage aus (mainTilt), nicht rohes
+    // beta/gamma — siehe dort. Der Sprungfilter unten gilt deshalb nur noch
+    // für Einführung und Szenenwahl, die weiterhin mit den rohen Winkeln
+    // arbeiten (dort reicht die Neigung nie in den kritischen Bereich).
+    if (!isIntroVisible && !isSelecting) {
+        const tilt = mainTilt(alpha, beta, gamma);
+        moveCursor(tilt.dGamma, tilt.dBeta);
+        return;
+    }
 
     // Sprünge des Lagesensors verwerfen, bevor sie in eine der Phasen laufen.
     if (gammaJump.check(gamma) || betaJump.check(beta)) return;
@@ -161,12 +221,7 @@ socket.on('sensorData', (data) => {
     }
 
     // Solange gewählt wird, steuert das Neigen die Szenenwahl, nicht den Zeiger.
-    if (isSelecting) {
-        evaluateSide(gammaBase.delta(gamma));
-        return;
-    }
-
-    moveCursor(gammaBase.delta(gamma), betaBase.delta(beta));
+    evaluateSide(gammaBase.delta(gamma));
 });
 
 socket.on('shake', () => {
@@ -224,6 +279,7 @@ function openSelect() {
     setTimeout(() => {
         gammaBase.reset();
         betaBase.reset();
+        qZero = null;
         setSide(null);
         // Nullpunkt und Sprung-Referenz frisch aus ruhiger Lage
         gammaJump.reset();
@@ -609,7 +665,6 @@ function resetBoard() {
     wrongId = null;
     backHoldStart = 0;
     backDone = false;
-    backSettleStart = 0;
     backShownAt = 0;
     isCursorPlaced = false;
     zeigeStationen();
@@ -627,19 +682,8 @@ const BACK_FADE = 400;    // ms, in denen der Kasten einblendet
 const BACK_SETTLE = 400;  // ms: kurzes Einrasten nach dem Halten, dann Rücksprung
 const BACK_FONT = '400 20px "Inclusive Sans", "Helvetica Neue", Helvetica, Arial, sans-serif';
 
-// Wackel-Rückmeldung im Stil des iOS-Jiggle-Modus: eine ruhige, rotations-
-// betonte Schwingung – leicht, sobald der Zeiger nahekommt, kräftiger beim
-// Halten (ersetzt die frühere Füllung als Lade-Rückmeldung). Der Ausschlag
-// bleibt bewusst klein. Längen in Board-Einheiten (der 1512×870-Raum, der auf
-// die Bildschirmbreite skaliert – am Ausstellungsschirm rund 1:1 zu px).
-const BACK_SHAKE_NEAR = 220;   // ab dieser Entfernung zum Kasten beginnt es
-const BACK_SHAKE_ROT = 1.1;    // max. Neigung in Grad (beim Halten)
-const BACK_SHAKE_MOVE = 2;     // max. seitlicher Versatz (Board-Einheiten)
-const BACK_SHAKE_FREQ = 8;     // Schwingungen je Sekunde – zügig, iOS-Jiggle-nah
-
 let backHoldStart = 0;   // 0 = der Zeiger liegt nicht auf dem Kasten
 let backDone = false;
-let backSettleStart = 0; // wann das Einrasten begann (nach vollem Halten)
 let backShownAt = 0;     // wann der Kasten erschienen ist (fürs Einblenden)
 
 // Die Breite ergibt sich aus dem Text, wie bei den Beschriftungen der Punkte.
@@ -680,7 +724,6 @@ function checkBackBox() {
         // (das Schütteln klingt aus, ein kleiner Snap bestätigt), dann folgt
         // der Rücksprung zur Auswahl.
         backDone = true;
-        backSettleStart = Date.now();
         setTimeout(() => {
             resetBoard();
             openSelect();
@@ -840,8 +883,8 @@ function drawLabel(point) {
 
 // Der Kasten, der zurück zur Auswahl führt – im Stil der idle-box der ersten
 // Station: weißer Kasten mit hellgrauem Rand und weichem Schatten, darin der
-// Hinweis im Instruction-Stil (Akzentfarbe, kleingeschrieben). Das Halten führt
-// weiterhin zurück (checkBackBox), nur ohne Fülleffekt.
+// Hinweis im Instruction-Stil (Akzentfarbe, kleingeschrieben). Der
+// Haltefortschritt füllt ihn dabei einfach von links nach rechts.
 function drawBackBox() {
     const box = backBox();
 
@@ -851,62 +894,42 @@ function drawBackBox() {
         ? clamp((Date.now() - backShownAt) / BACK_FADE, 0, 1)
         : 1;
 
-    // Wie stark gewackelt wird: nach Nähe des Zeigers (Abstand zum Kasten),
-    // kräftiger, solange gehalten wird. Beide Anteile addieren sich – beim
-    // Halten liegt der Zeiger ohnehin auf dem Kasten (Nähe voll).
-    const dx = Math.max(box.left - cursorX, 0, cursorX - (box.left + box.w));
-    const dy = Math.max(box.top - cursorY, 0, cursorY - (box.top + box.h));
-    const dist = Math.hypot(dx, dy);
-    const near = clamp(1 - dist / BACK_SHAKE_NEAR, 0, 1);
-    const held = backHoldStart ? clamp((Date.now() - backHoldStart) / BACK_HOLD, 0, 1) : 0;
+    // Haltefortschritt, 0..1 — bleibt nach dem Einrasten voll gefüllt stehen,
+    // bis der Rücksprung zur Auswahl folgt (checkBackBox).
+    const held = backDone ? 1
+        : backHoldStart ? clamp((Date.now() - backHoldStart) / BACK_HOLD, 0, 1)
+        : 0;
 
-    // Einrasten nach vollem Halten: Das Wackeln klingt rasch aus (settleFade)
-    // und der Kasten bleibt einfach stehen – keine Vergrößerung.
-    const settleT = backSettleStart ? clamp((Date.now() - backSettleStart) / BACK_SETTLE, 0, 1) : 0;
-    const settleFade = 1 - settleT;
-
-    // Stärke des Jiggles: additiv wie in der ersten Version – ein Grundanteil
-    // aus der Nähe, dazu ein mit der Haltezeit stetig wachsender Anteil. So
-    // nimmt es sichtbar zu, solange der Zeiger auf dem Kasten liegt.
-    const strength = clamp(near * 0.4 + held * 0.6, 0, 1) * settleFade;
-
-    // iOS-Jiggle: ruhige, rotationsbetonte Schwingung; der kleine Versatz läuft
-    // auf leicht anderer Frequenz und Phase, damit es organisch statt
-    // maschinell wirkt.
-    const wr = Date.now() / 1000 * BACK_SHAKE_FREQ * 2 * Math.PI;
-    const wm = Date.now() / 1000 * BACK_SHAKE_FREQ * 0.85 * 2 * Math.PI + 0.6;
-    const shakeRot = strength * BACK_SHAKE_ROT * Math.PI / 180 * Math.sin(wr);
-    const shakeX = strength * BACK_SHAKE_MOVE * Math.sin(wm);
-    const shakeY = strength * BACK_SHAKE_MOVE * 0.6 * Math.sin(wm + 1.0);
-
-    const cx = box.left + box.w / 2;
-    const cy = box.top + box.h / 2;
+    const boxPath = new Path2D();
+    boxPath.roundRect(box.left, box.top, box.w, box.h, 14);
 
     ctx.save();
     ctx.globalAlpha = alpha;
 
-    // Wackeln um die Kastenmitte – Fläche und Schrift bewegen sich zusammen.
-    ctx.translate(cx + shakeX, cy + shakeY);
-    ctx.rotate(shakeRot);
-    ctx.translate(-cx, -cy);
-
     // Weiße Fläche mit weichem Schatten (wie die idle-box).
-    ctx.beginPath();
-    ctx.roundRect(box.left, box.top, box.w, box.h, 14);
     ctx.shadowColor = 'rgba(0, 0, 0, 0.12)';
     ctx.shadowBlur = 20;
     ctx.shadowOffsetY = 8;
     ctx.fillStyle = '#ffffff';
-    ctx.fill();
+    ctx.fill(boxPath);
 
-    // Rand und Schrift ohne Schatten.
+    // Rand und Füllbalken ohne Schatten.
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
 
+    // Haltefortschritt als Balken, der den Kasten von links nach rechts füllt.
+    if (held > 0) {
+        ctx.save();
+        ctx.clip(boxPath);
+        ctx.fillStyle = 'rgba(253, 100, 88, 0.35)';
+        ctx.fillRect(box.left, box.top, box.w * held, box.h);
+        ctx.restore();
+    }
+
     ctx.strokeStyle = '#e2e8f0';
     ctx.lineWidth = 1;
-    ctx.stroke();
+    ctx.stroke(boxPath);
 
     ctx.font = BACK_FONT;
     ctx.fillStyle = '#fd6458';

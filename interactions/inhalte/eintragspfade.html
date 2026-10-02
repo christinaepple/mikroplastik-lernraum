@@ -28,6 +28,13 @@
 
             --font-head: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
             --font-text: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+
+            /* Das eingescannte Papier als Fläche, wie im Sucher: ein
+               halbdeckender weißer Wasch nimmt ihm etwas Stärke, kein
+               zusätzliches Korn obenauf. */
+            --paper-bg:
+                linear-gradient(rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.38)),
+                url('/img/interactionen/textur.jpg') center center / cover no-repeat;
         }
 
         * {
@@ -39,13 +46,13 @@
         html,
         body {
             height: 100%;
+            background: var(--paper-bg);
         }
 
         body {
             font-family: var(--font-text);
             font-weight: 400;
             line-height: 1.5;
-            background-color: var(--bg-card);
             color: var(--text-main);
             display: flex;
             flex-direction: column;
@@ -158,8 +165,27 @@
            bleiben sichtbar. */
         .stage.is-covered > .layer,
         .stage.is-covered > .area,
-        .stage.is-covered > .idle {
+        .stage.is-covered > .cursor-bubble {
             visibility: hidden;
+        }
+
+        /* ── Zeiger ─────────────────────────────────────────────────────
+           Wie in Größeneinordnung: ein frei beweglicher Punkt, der die
+           Neigung direkt zeigt. Bleibt auch bei offenem Text sichtbar – hilft
+           dort ebenso, etwa beim Zurückfinden zur Mitte. Keine Übergänge –
+           die sollen die Position nicht verzögern. */
+        .cursor-bubble {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 34px;
+            height: 34px;
+            margin-top: -17px;
+            margin-left: -17px;
+            border-radius: 50%;
+            background: rgba(15, 23, 42, 0.22);
+            pointer-events: none;
+            z-index: 5;
         }
 
         .area {
@@ -269,7 +295,9 @@
 
         .info-obenrechts .info-split {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            /* Rechte Spalte etwas breiter als die linke — die Spaltengrenze
+               (und damit der Textbeginn rechts) rückt dadurch nach links. */
+            grid-template-columns: 1fr 1.35fr;
             grid-template-rows: 64% auto;
             column-gap: 68px;
             height: 100%;
@@ -364,7 +392,7 @@
             position: absolute;
             inset: 0;
             z-index: 12;
-            background: var(--bg-card, #ffffff);
+            background: var(--paper-bg);
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.6s ease;
@@ -412,7 +440,7 @@
             position: absolute;
             inset: 0;
             z-index: 11;
-            background: var(--bg-card);
+            background: var(--paper-bg);
             transition: opacity 0.5s ease;
         }
 
@@ -424,41 +452,6 @@
         }
 
         
-
-        /* ── Hinweis bei Inaktivität ───────────────────────────────────
-           Erscheint erst, wenn im geöffneten Text eine Weile keine Bewegung
-           mehr ankommt. Anders als im Modul „3 Bereiche“ liegt er nicht über
-           der ganzen Fläche, sondern nur am unteren Rand: Hier wird gelesen,
-           und Ruhe ist dabei keine Ratlosigkeit – ein deckender Hinweis
-           würde mitten im Satz dazwischengehen. */
-        .idle {
-            position: absolute;
-            bottom: 54px;
-            left: 0;
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.4s ease;
-            z-index: 8;
-        }
-
-        .idle.is-visible {
-            opacity: 1;
-        }
-
-        .idle-box {
-            max-width: 520px;
-            padding: 14px 22px;
-            background: #ffffff;
-            border: 1px solid var(--border-card);
-            border-radius: 14px;
-            box-shadow: 0 8px 20px -6px rgba(0, 0, 0, 0.12);
-            font-size: 1rem;
-            line-height: 1.6;
-            text-align: center;
-        }
 
         /* Lesbarkeit über der Zeichnung: An einigen Stellen überlagert die
            schwarze Zeichnung den Text. Ein dichter weißer Schein hinter den
@@ -615,11 +608,9 @@
             </div>
         </div>
 
-        <div class="idle" id="idle">
-            <div class="idle-box instruction">
-                Halte das Gerät wieder gerade, um zurück zum Gesamtbild zu kommen.
-            </div>
-        </div>
+        <!-- Zeiger während der Hauptinteraktion, wie die Bubble in
+             Größeneinordnung (js/interactions/inhalte/groesseneinordnung.js). -->
+        <div class="cursor-bubble" id="cursorBubble"></div>
 
         <!-- Einführungsspiel: steht nach der Kalibrierung vor dem Inhalt und
              erklärt die Geste, indem es sie einmal verlangt. -->

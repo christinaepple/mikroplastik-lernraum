@@ -41,7 +41,7 @@
             height: 100%;
             overflow: hidden;
             background: var(--bg);
-            font-family: 'Helvetica Neue', -apple-system, sans-serif;
+            font-family: var(--font-text);
             color: var(--ink);
             touch-action: none;
         }
@@ -52,7 +52,10 @@
             display: block;
         }
 
-        /* Start-Overlay (iOS-Sensorfreigabe braucht eine Nutzergeste) */
+        /* Start-Overlay (iOS-Sensorfreigabe braucht eine Nutzergeste).
+           Titel und Button werden bewusst auseinandergezogen (space-between)
+           statt mittig gestapelt — der Abstand zum Rand skaliert über vh mit
+           der Bildschirmhöhe, statt an einer festen Mitte zu kleben. */
         .start {
             position: fixed;
             inset: 0;
@@ -60,16 +63,24 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            gap: 18px;
-            padding: 32px;
+            justify-content: space-between;
+            padding: clamp(28px, 10vh, 120px) 32px;
             text-align: center;
             background: var(--bg);
         }
 
         .start h1 {
-            font-size: 1.4rem;
-            font-weight: 400;
+            width: min(90%, 28em);
+            font-size: clamp(1.4rem, 7vw, 2rem);
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        .start-action {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 18px;
         }
 
         .start p {
@@ -80,7 +91,6 @@
         }
 
         .start-btn {
-            margin-top: 8px;
             padding: 14px 28px;
             border: 1px solid var(--ink);
             border-radius: 999px;
@@ -105,7 +115,7 @@
         }
 
         /* Während eine Station auf dem großen Bildschirm läuft: das Handy ist
-           nur noch ihr Controller, der Sucher ruht. Schwarzes Blatt, weißer
+           nur noch ihr Controller, der Sucher ruht. Weißes Blatt, dunkler
            Text in der Projektschrift. */
         .station-wait {
             position: fixed;
@@ -121,17 +131,38 @@
             background: #ffffff;
             color: var(--ink);
             font-family: var(--font-text);
+            transition: background 0.4s ease, color 0.4s ease;
         }
 
         .station-wait[hidden] {
             display: none;
         }
 
+        /* Wie die Anweisungszeilen sonst (.instruction): klein in der Anzeige,
+           im Markup normal geschrieben. */
         .station-wait p {
             max-width: 20ch;
             font-size: 1.25rem;
             font-weight: 400;
             line-height: 1.5;
+            text-transform: lowercase;
+        }
+
+        /* Ist die Station durchgespielt, schlägt die Ansicht in die Akzentfarbe
+           um — Vollfarbe statt der weiß/schwarz-Optik sonst. Der Farbwechsel
+           selbst holt den Blick zurück aufs Handy: genau hier geht's weiter,
+           nicht mehr auf dem großen Bildschirm. */
+        .station-wait.is-finished {
+            background: var(--accent);
+            color: #ffffff;
+        }
+
+        .station-wait.is-finished .return-progress {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .station-wait.is-finished .return-progress > div {
+            background: #ffffff;
         }
 
         /* Fortschritt des Zurück-Schüttelns — hier auf dem Handy, wo geschüttelt
@@ -143,7 +174,7 @@
             background: rgba(15, 23, 42, 0.12);
             overflow: hidden;
             opacity: 0;
-            transition: opacity 0.25s ease;
+            transition: opacity 0.25s ease, background 0.4s ease;
         }
 
         .return-progress.is-on {
@@ -154,7 +185,7 @@
             height: 100%;
             width: 0%;
             background: var(--accent);
-            transition: width 0.12s linear;
+            transition: width 0.12s linear, background 0.4s ease;
         }
 
         /* Signifier fürs Handoff: Sobald ein Bild getragen wird, leuchtet an der
@@ -195,6 +226,271 @@
             color: var(--accent);
         }
 
+        /* Hilfe-Kreis unten links: durchgehend verfügbar (gesetzt via [hidden]
+           in controller_sucher.js, erst ab dem Start sichtbar), unabhängig
+           davon, welche Vollbild-Ansicht gerade läuft — deshalb fixed und mit
+           höherem z-index als .station-wait/.all-done (20). */
+        .help-btn {
+            position: fixed;
+            left: 20px;
+            bottom: max(20px, env(safe-area-inset-bottom, 0px));
+            z-index: 21;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 1.5px solid var(--ink);
+            color: var(--ink);
+            font-family: var(--font-text);
+            font-size: 1rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .help-btn[hidden] {
+            display: none;
+        }
+
+        /* Unteres Viertel: links drei Optionen untereinander (Gestenhilfe,
+           Station überspringen, Alles zurücksetzen), rechts allein die
+           Kalibrierung – sie ist kein Reset wie die anderen drei, sondern
+           etwas, das man unterwegs häufiger braucht, deshalb eigene Spalte.
+           Schwarz-weiß, schlicht, kein Icon. */
+        .help-sheet {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 22;
+            display: none;
+            align-items: center;
+            height: 30vh;
+            min-height: 200px;
+            padding: 18px clamp(18px, 6vw, 40px) max(18px, env(safe-area-inset-bottom, 0px));
+            background: #000000;
+            transform: translateY(100%);
+            opacity: 0;
+            transition: transform 0.32s ease, opacity 0.32s ease;
+        }
+
+        .help-sheet.is-open {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .help-sheet-close {
+            position: absolute;
+            top: 14px;
+            right: 16px;
+            background: none;
+            border: 0;
+            color: #ffffff;
+            font-family: var(--font-text);
+            font-size: 1.2rem;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .help-sheet-grid {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            width: 100%;
+        }
+
+        .help-sheet-col {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex: 1 1 60%;
+        }
+
+        /* Schmaler als die rechte Spalte — die Reset-Aktionen brauchen weniger
+           Raum als die wachsende Liste rechts (Gestenhilfe/Kalibrierung/Quellen). */
+        .help-sheet-col-muted {
+            flex: 0 1 34%;
+        }
+
+        .help-sheet-btn {
+            background: none;
+            border: 0;
+            color: #ffffff;
+            font-family: var(--font-text);
+            font-size: 0.88rem;
+            font-weight: 500;
+            text-align: left;
+            text-transform: lowercase;
+            line-height: 1.4;
+            padding: 10px 4px;
+            cursor: pointer;
+        }
+
+        /* Die linke Spalte (Station überspringen / Alles zurücksetzen) tritt
+           etwas in den Hintergrund — grau statt weiß. */
+        .help-sheet-col-muted .help-sheet-btn {
+            color: rgba(255, 255, 255, 0.45);
+        }
+
+        /* Bestätigungs-Zustand: "Station überspringen" / "Alles zurücksetzen"
+           lösen erst beim zweiten Antippen aus — bis dahin in der Akzentfarbe.
+           Gilt auch in der grauen Spalte, deshalb nach der Regel oben. */
+        .help-sheet-btn.is-confirm {
+            color: var(--accent);
+        }
+
+        /* Vollbild-Gestenhilfe: schwarz, Text linksbündig, eine Geste pro Zeile. */
+        .gesture-help {
+            position: fixed;
+            inset: 0;
+            z-index: 23;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            padding: 56px 30px;
+            background: #000000;
+            opacity: 0;
+            transition: opacity 0.32s ease;
+        }
+
+        .gesture-help.is-open {
+            opacity: 1;
+        }
+
+        .gesture-help-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: 0;
+            color: #ffffff;
+            font-family: var(--font-text);
+            font-size: 1.3rem;
+            cursor: pointer;
+        }
+
+        .gesture-help-text {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .gesture-help-text p {
+            color: #ffffff;
+            text-align: left;
+            font-size: clamp(0.92rem, 4vw, 1.1rem);
+            font-weight: 400;
+            line-height: 1.5;
+        }
+
+        /* Vollbild-Quellenverzeichnis: zeigt die eigenständige Seite
+           interactions/inhalte/quellenverzeichnis.html in einem Rahmen —
+           weiß statt schwarz, weil die Seite selbst hell gestaltet ist. */
+        .sources-sheet {
+            position: fixed;
+            inset: 0;
+            z-index: 23;
+            display: none;
+            flex-direction: column;
+            background: #ffffff;
+            opacity: 0;
+            transition: opacity 0.32s ease;
+        }
+
+        .sources-sheet.is-open {
+            opacity: 1;
+        }
+
+        .sources-sheet-close {
+            position: absolute;
+            top: 14px;
+            right: 16px;
+            z-index: 1;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 1.5px solid var(--ink);
+            color: var(--ink);
+            font-family: var(--font-text);
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .sources-frame {
+            flex: 1;
+            width: 100%;
+            border: 0;
+        }
+
+        /* Alle Stationen durchgespielt: ersetzt die leere Bodenansicht, solange
+           nichts mehr aufzunehmen ist. Gleicher Stil wie .station-wait. */
+        .all-done {
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 28px;
+            padding: 40px;
+            text-align: center;
+            background: #ffffff;
+            color: var(--ink);
+            font-family: var(--font-text);
+        }
+
+        .all-done[hidden] {
+            display: none;
+        }
+
+        .all-done-text {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .all-done-text p {
+            max-width: 22ch;
+            font-size: 1.25rem;
+            font-weight: 400;
+            line-height: 1.5;
+            text-transform: lowercase;
+        }
+
+        /* Klein und am Rand — eine beiläufige Figur, keine Illustration in
+           der Mitte. */
+        .all-done-person {
+            position: absolute;
+            right: 20px;
+            bottom: max(20px, env(safe-area-inset-bottom, 0px));
+            width: clamp(36px, 9vw, 54px);
+            height: auto;
+            animation: all-done-bounce 1.8s ease-in-out infinite;
+        }
+
+        /* Der Hüpfer selbst passt in die ersten 45% der Laufzeit, danach steht
+           die Figur eine kurze Pause still, bevor der nächste Hüpfer beginnt –
+           statt durchgehend auf und ab zu wippen. */
+        @keyframes all-done-bounce {
+
+            0%,
+            45%,
+            100% {
+                transform: translateY(0);
+            }
+
+            22% {
+                transform: translateY(-18px);
+            }
+        }
+
         /* Hinweiszeile am unteren Rand */
         .hint {
             position: fixed;
@@ -224,15 +520,64 @@
     <div class="hint" id="hint">Halte das Handy flach und blicke vor deine Füße</div>
 
     <div class="start" id="start">
-        <h1>Sucher</h1>
-        <p>Blicke mit dem Handy in den Boden. Im Umkreis deiner Füße liegen Bilder — dreh dich auf der Stelle, um sie zu finden, und halte eines ins Fadenkreuz, um es aufzunehmen. Auf dem großen Bildschirm legst du es ab und baust daraus deine Collage.</p>
-        <button class="start-btn" id="startBtn">Sucher starten</button>
-        <div class="error" id="errorMsg"></div>
+        <h1>Hybrider Lernraum:<br>Mikroplastik in Böden</h1>
+        <div class="start-action">
+            <button class="start-btn" id="startBtn">lernraum starten</button>
+            <div class="error" id="errorMsg"></div>
+        </div>
     </div>
 
     <div class="station-wait" id="stationWait" hidden>
-        <p>Station läuft. Schüttel lange, um zurück zur Übersicht zu gelangen</p>
+        <p id="stationWaitText">Lernstation läuft<br>Schüttel lange, um zurück zur Übersicht zu gelangen</p>
         <div class="return-progress" id="returnProgress"><div id="returnProgressFill"></div></div>
+    </div>
+
+    <div class="all-done" id="allDone" hidden>
+        <div class="all-done-text">
+            <p>du hast alle lerninhalte bearbeitet</p>
+            <p>du kannst dir jeden inhalt nochmal angucken, wenn du möchtest</p>
+        </div>
+        <img class="all-done-person" src="/img/interactionen/einstieg/person.png" alt="">
+    </div>
+
+    <!-- Hilfe: durchgehend verfügbar, sobald der Lernraum läuft (nicht schon
+         auf dem Freigabe-Bildschirm) — unabhängig davon, ob gerade der Boden
+         durchsucht wird, eine Station läuft oder alles schon gesammelt ist. -->
+    <button class="help-btn" id="helpBtn" type="button" aria-label="Hilfe" hidden>?</button>
+
+    <div class="help-sheet" id="helpSheet" hidden>
+        <button class="help-sheet-close" id="helpSheetClose" type="button" aria-label="Schließen">✕</button>
+        <div class="help-sheet-grid">
+            <div class="help-sheet-col help-sheet-col-muted">
+                <button class="help-sheet-btn" id="skipStationBtn" type="button">Station überspringen</button>
+                <button class="help-sheet-btn" id="resetAllBtn" type="button">Alles zurücksetzen</button>
+            </div>
+            <div class="help-sheet-col">
+                <button class="help-sheet-btn" id="gestureHelpBtn" type="button">Gestenhilfe</button>
+                <button class="help-sheet-btn" id="calibrateBtn" type="button">Kalibrierung</button>
+                <button class="help-sheet-btn" id="sourcesBtn" type="button">Quellen</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="gesture-help" id="gestureHelp" hidden>
+        <button class="gesture-help-close" id="gestureHelpClose" type="button" aria-label="Schließen">✕</button>
+        <div class="gesture-help-text">
+            <p>hebe ein bild vom boden auf</p>
+            <p>kippe dein handy nach oben und sieh auf den zweiten bildschirm</p>
+            <p>halte es lange an einer stelle, um es aufzukleben</p>
+            <p>halte erneut, um die interaktive station zu starten</p>
+            <p>langes schütteln bringt dich zurück zur übersicht</p>
+            <p>erst wenn du die station absolviert hast, kannst du die nächste aufsammeln</p>
+        </div>
+    </div>
+
+    <!-- Quellenverzeichnis: dieselbe eigenständige Seite wie in den Inhalten
+         (interactions/inhalte/quellenverzeichnis.html), hier nur eingerahmt
+         statt als eigene Navigation — die Sucher-Sitzung bleibt so bestehen. -->
+    <div class="sources-sheet" id="sourcesSheet" hidden>
+        <button class="sources-sheet-close" id="sourcesSheetClose" type="button" aria-label="Schließen">✕</button>
+        <iframe class="sources-frame" id="sourcesFrame" title="Quellenverzeichnis"></iframe>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>

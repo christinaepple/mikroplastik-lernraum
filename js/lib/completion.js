@@ -31,6 +31,17 @@ export function reportCompletion({ label = '' } = {}) {
     }, location.origin);
 }
 
+/** Meldet einen sichtbaren Zwischenstand an die einbettende Seite. */
+export function reportProgress({ state = '' } = {}) {
+    if (window.parent === window) return;
+
+    window.parent.postMessage({
+        type: 'interaction:progress',
+        page: location.pathname,
+        state,
+    }, location.origin);
+}
+
 /**
  * Nimmt die Abschlussmeldungen eingebetteter Module entgegen.
  *
@@ -44,6 +55,16 @@ export function onCompletion(handler) {
     window.addEventListener('message', (event) => {
         if (event.origin !== location.origin) return;
         if (!event.data || event.data.type !== 'interaction:complete') return;
+
+        handler(event.data, event.source);
+    });
+}
+
+/** Nimmt sichtbare Zwischenstände eines eingebetteten Moduls entgegen. */
+export function onProgress(handler) {
+    window.addEventListener('message', (event) => {
+        if (event.origin !== location.origin) return;
+        if (!event.data || event.data.type !== 'interaction:progress') return;
 
         handler(event.data, event.source);
     });

@@ -18,14 +18,14 @@
 import { socket, shareCalibration } from '../../lib/socket.js';
 import { initConnectionBadge } from '../../lib/connection.js';
 import { Baseline, clamp, createJumpFilter } from '../../lib/angles.js';
-import { reportCompletion } from '../../lib/completion.js';
+import { reportCompletion, reportProgress } from '../../lib/completion.js';
 import { createLongShake } from '../../lib/shake.js';
 import { initCalibration } from '../../lib/calibration.js';
 import { byId } from '../../lib/dom.js';
 
 const calBtn = byId('calBtn');
 const stage = byId('stage');
-const idle = byId('idle');
+const cursorBubble = byId('cursorBubble');
 
 const areas = {
     obenLinks: byId('areaObenLinks'),
@@ -40,7 +40,47 @@ const areas = {
 // verschieden: Zur Seite neigt man das Gerät weit, nach vorn kippt man es nur
 // wenig. Eine gemeinsame Schwelle für beides macht genau das Kippen zäh.
 const SELECT_GAMMA = 22;
-const SELECT_BETA = 16;
+
+// Beim Kippen ist "oben" und "unten" nicht dieselbe Bewegung: Von sich weg
+// kippen (oben) lässt das Handgelenk weit nachgeben, zu sich hin kippen
+// (unten) stößt viel früher an seine Grenze – vor allem zusammen mit der
+// seitlichen Neigung für die unteren Ecken. Mit einer gemeinsamen Schwelle
+// blieben "untenLinks"/"untenRechts" kaum oder nur zitternd erreichbar.
+const SELECT_BETA_OBEN = 16;
+const SELECT_BETA_UNTEN = 11;
+
+/** Die Beta-Schwelle, die für diese Richtung gilt. */
+function selectBetaFor(dBeta) {
+    return dBeta < 0 ? SELECT_BETA_OBEN : SELECT_BETA_UNTEN;
+}
+
+// Ausschlag des Zeigers bei voller Schwelle einer Achse (ratio 1) – als
+// Anteil der halben Bühne, nicht als fester Pixelwert: Ein fixer Wert lag auf
+// echten Bildschirmen zu nah an der Mitte, der Zeiger kam nie sichtbar auf
+// dem Bild einer Ecke an. Beide Achsen laufen trotz unterschiedlicher Winkel
+// (SELECT_BETA_OBEN/SELECT_BETA_UNTEN) auf denselben Anteil, damit der Zeiger
+// in jede der vier Richtungen gleich weit wandert.
+const BUBBLE_REACH = 0.42;
+let bubbleMaxX = 0;
+let bubbleMaxY = 0;
+
+/** Setzt die Reichweite des Zeigers neu – bei Start und bei Größenänderung. */
+function sizeBubbleRange() {
+    const rect = stage.getBoundingClientRect();
+    bubbleMaxX = (rect.width / 2) * BUBBLE_REACH;
+    bubbleMaxY = (rect.height / 2) * BUBBLE_REACH;
+}
+
+// Etwas Übertrag über den Anschlag hinaus, sonst klebt der Zeiger schon bei
+// erreichter Schwelle am Rand und zeigt nicht mehr, wie viel Luft noch wäre.
+const BUBBLE_OVERSHOOT = 1.35;
+
+// Dieselbe sanfte Angleichung wie beim Zeiger im Einführungsspiel
+// (dort LEHRE_SMOOTHING): Ohne sie wird die rohe Neigung direkt ausgewertet,
+// und jedes kleine Zittern der Hand an der Schwelle wirft die Auswahl wieder
+// heraus (stopHold() setzt den Fortschritt dann zurück auf null) – genau das
+// Gefühl, das im geglätteten Einführungsspiel nicht auftritt.
+const TILT_SMOOTHING = 0.08;
 
 // Anteil der Schwelle, bis zu dem eine getroffene Auswahl stehen bleibt. Ohne
 // diesen Abstand flackert sie an der Schwelle bei jeder kleinen Handbewegung.
@@ -82,21 +122,6 @@ const PREVIEW_MAX = 0.45;
 // Hand.
 const CENTER_RELEASE_RATIO = 1;
 
-// ── Hinweis bei Inaktivität ────────────────────────────────────────────────
-// Nur für den Fall, dass jemand im geöffneten Text nicht weiterweiß. Er
-// erscheint erst, wenn eine Weile keine Bewegung mehr ankommt, und
-// verschwindet mit der ersten wieder.
-//
-// Die Wartezeit ist deutlich länger als im Modul „3 Bereiche“ (dort 8 s):
-// Hier wird gelesen, und wer liest, hält das Gerät ruhig. Ein früher Hinweis
-// wäre keine Hilfe, sondern eine Unterstellung.
-const IDLE_DELAY = 25000;
-
-// Grad, ab denen eine Lageänderung als Bewegung zählt. Der Sensorstrom läuft
-// auch beim ruhig gehaltenen Gerät weiter, die Ereignisse allein sagen also
-// nichts; das Rauschen liegt deutlich unter dieser Schwelle.
-const IDLE_MOTION = 4;
-
 // Halten bis zum Einrasten. Der Fade beginnt direkt beim Erreichen einer Ecke,
 // damit die Auswahl sofort eine sichtbare Rückmeldung gibt.
 const HOLD_DELAY = 500;
@@ -110,6 +135,12 @@ const SETTLE_DELAY = 600;
 // Der Nullpunkt entsteht beim ersten Sensorwert; die Kopfzeile setzt ihn neu.
 const gammaBase = new Baseline({ wrap: false });
 const betaBase = new Baseline({ wrap: false });
+
+// Geglättete Neigung für die Hauptauswahl (TILT_SMOOTHING). Startet beim
+// ersten Wert direkt dort, statt erst heranzulaufen.
+let smoothDGamma = 0;
+let smoothDBeta = 0;
+let smoothReady = false;
 
 // Gegen die Sprünge beim Neigen zur Seite: Nahe der Senkrechten schlägt der
 // Rohwert von gamma um, und die Auswahl sprang dann in die gegenüberliegende
@@ -139,8 +170,6 @@ let holdFrame = null;
 let holdStart = null;
 let isReturnHold = false;    // laeuft gerade das Halten zurueck zur Uebersicht
 
-let idleTimer = null;
-let lastAngles = null;       // letzte Lage, die als Bewegung gezählt hat
 let shownReturn = 0;         // wie weit die Collage gerade zurückgeholt ist
 
 const connection = initConnectionBadge();
@@ -150,6 +179,7 @@ function calibrate() {
     betaBase.reset();
     gammaJump.reset(); // sonst gälte die neue Haltung selbst als Sprung
     betaJump.reset();
+    smoothReady = false; // sonst glättet der nächste Wert noch gegen den alten Nullpunkt
     calBtn.style.backgroundColor = '#f1f5f9';
     calBtn.textContent = '✅ Kalibriert';
     setTimeout(() => {
@@ -192,9 +222,18 @@ socket.on('sensorData', (data) => {
     const gamma = data.gamma !== null ? data.gamma : 0;
     const beta = data.beta !== null ? data.beta : 0;
 
+    // Der Zeiger zeigt die Lage sofort und roh – noch vor der Sprungsperre
+    // unten. Die verwirft nahe der Senkrechten auch mal länger am Stück
+    // (s. createJumpFilter), weil dort echte Umschläge im Sensor stecken;
+    // würde der Zeiger an derselben Stelle hängen, wirkte er eingefroren,
+    // gerade dort, wo am weitesten geneigt wird.
+    if (!isLehreVisible && !isIntroVisible) {
+        moveBubble(gammaBase.delta(gamma), betaBase.delta(beta));
+    }
+
     // Sprünge des Lagesensors verwerfen, bevor sie irgendwo ankommen – sonst
     // schlägt die Auswahl schon beim weiten Neigen zur Seite in die andere
-    // Ecke um, und der Inaktivitäts-Hinweis zählte den Sprung als Bewegung.
+    // Ecke um.
     if (gammaJump.check(gamma) || betaJump.check(beta)) return;
 
     // Vor dem Inhalt steht das Einführungsspiel: Dasselbe Neigen führt dort
@@ -207,34 +246,22 @@ socket.on('sensorData', (data) => {
     // Solange die Tafel steht, wird gelesen, nicht ausgewählt.
     if (isIntroVisible) return;
 
-    noteMotion(beta, gamma);
+    const rawDGamma = gammaBase.delta(gamma);
+    const rawDBeta = betaBase.delta(beta);
 
-    evaluateSelection(gammaBase.delta(gamma), betaBase.delta(beta));
+    if (!smoothReady) {
+        smoothDGamma = rawDGamma;
+        smoothDBeta = rawDBeta;
+        smoothReady = true;
+    } else {
+        smoothDGamma += (rawDGamma - smoothDGamma) * TILT_SMOOTHING;
+        smoothDBeta += (rawDBeta - smoothDBeta) * TILT_SMOOTHING;
+    }
+
+    evaluateSelection(smoothDGamma, smoothDBeta);
 });
 
 
-
-// Bewegung heißt Lageänderung, nicht eingehendes Ereignis.
-function noteMotion(beta, gamma) {
-    if (lastAngles
-        && Math.abs(beta - lastAngles.beta) < IDLE_MOTION
-        && Math.abs(gamma - lastAngles.gamma) < IDLE_MOTION) {
-        return;
-    }
-
-    lastAngles = { beta, gamma };
-    resetIdle();
-}
-
-// Blendet den Hinweis aus und stellt die Uhr zurück. Sie läuft nur, solange
-// ein Text offen ist – sonst gibt es nichts zu erklären.
-function resetIdle() {
-    idle.classList.remove('is-visible');
-    clearTimeout(idleTimer);
-    if (!focusedArea) return;
-
-    idleTimer = setTimeout(() => idle.classList.add('is-visible'), IDLE_DELAY);
-}
 
 /**
  * In welche Ecke das Gerät zeigt. Die seitliche Neigung entscheidet über
@@ -247,11 +274,25 @@ function areaFor(dGamma, dBeta) {
     return level + side;
 }
 
+/**
+ * Zeigt die Neigung direkt an – wie die frei bewegliche Bubble in
+ * groesseneinordnung.js. Die Achsen laufen je an ihrer eigenen Schwelle auf
+ * denselben Pixel-Ausschlag, damit der Zeiger in jede Ecke gleich weit
+ * wandert, obwohl SELECT_BETA_OBEN/SELECT_BETA_UNTEN unterschiedlich groß
+ * sind: So zeigt er direkt, wie nah eine Ecke schon ist, statt dass man es
+ * nur am Einrasten merkt.
+ */
+function moveBubble(dGamma, dBeta) {
+    const x = clamp(dGamma / SELECT_GAMMA, -BUBBLE_OVERSHOOT, BUBBLE_OVERSHOOT) * bubbleMaxX;
+    const y = clamp(dBeta / selectBetaFor(dBeta), -BUBBLE_OVERSHOOT, BUBBLE_OVERSHOOT) * bubbleMaxY;
+    cursorBubble.style.transform = `translate(${x}px, ${y}px)`;
+}
+
 function evaluateSelection(dGamma, dBeta) {
     // Beide Achsen werden an ihrer eigenen Schwelle gemessen: Zur Seite neigt
     // man das Gerät weit, nach vorn oder hinten kippt man es nur wenig.
     const ratioSide = Math.abs(dGamma) / SELECT_GAMMA;
-    const ratioLevel = Math.abs(dBeta) / SELECT_BETA;
+    const ratioLevel = Math.abs(dBeta) / selectBetaFor(dBeta);
 
     // Für eine Ecke müssen beide Achsen ausschlagen – deshalb die kleinere
     // der beiden. Eine reine Seitwärtsneigung liegt zwischen zwei Ecken, und
@@ -262,7 +303,14 @@ function evaluateSelection(dGamma, dBeta) {
 
     showReturn(rest);
 
-    if (reach >= 1) {
+    // Beide Achsen gleichzeitig bis zum Anschlag ist diagonal eine andere,
+    // engere Bewegung als jede für sich – wer z. B. beim Kalibrieren das Handy
+    // schon fast senkrecht hält, hat kaum noch Spielraum, zugleich auch noch
+    // voll zur Seite zu kommen (vgl. rechts unten). Darum reicht die stärkere
+    // Achse am Anschlag (rest), die schwächere genügt mit demselben Anteil wie
+    // beim Halten einer Ecke (RELEASE_RATIO) – diagonal ist dann nicht mehr
+    // schwerer als eine einzelne Achse.
+    if (rest >= 1 && reach >= RELEASE_RATIO) {
         setPose(corner);
         return;
     }
@@ -445,9 +493,6 @@ function finishHold() {
         stage.classList.add('is-focused');
         markSeen(pose);
     }
-
-    // Ab hier kann ein Hinweis fällig werden – oder eben nicht mehr.
-    resetIdle();
 }
 
 // Bricht nur den Fortschritt ab; was bereits offen ist, bleibt es.
@@ -468,7 +513,6 @@ function clearFocus() {
     focusedArea = null;
     stage.classList.remove('is-focused');
     showReturn(PREVIEW_FROM); // ohne offenen Text ergibt das null
-    resetIdle();
 }
 
 // ── Klick-Fallback ──────────────────────────────────────────────────────────
@@ -484,7 +528,6 @@ function openArea(name) {
     stage.classList.add('is-focused');
     setZurueck(0);
     markSeen(name);
-    resetIdle();
 }
 
 // Zurück zur Übersicht, wie am Ende des Geradehaltens.
@@ -498,13 +541,18 @@ function returnToOverview() {
 // ── Abschluss ──────────────────────────────────────────────────────────────
 
 // Gesehen hat einen Pfad, wer seinen Text offen hatte – das bloße Anstreifen
-// im Vorbeineigen zählt dafür nicht.
+// im Vorbeineigen zählt dafür nicht. Schon der erste geöffnete Pfad färbt das
+// Keyvisual im Sucher ein; abgeschlossen ist die Station erst nach allen vier.
 function markSeen(area) {
+    const wasEmpty = seen.size === 0;
     seen.add(area);
-    if (seen.size < Object.keys(areas).length || isReported) return;
+
+    if (wasEmpty) reportProgress({ state: 'keyvisual-revealed' });
+    if (isReported) return;
+    if (seen.size < Object.keys(areas).length) return;
 
     isReported = true;
-    reportCompletion({ label: 'Alle vier Eintragspfade gesehen' });
+    reportCompletion({ label: 'Alle Eintragspfade gesehen' });
 }
 
 
@@ -516,7 +564,7 @@ function markSeen(area) {
 //  Bedienung verstanden, ohne dass sie erklärt werden müsste.
 //
 //  Die Punkte liegen nicht irgendwo in den Ecken, sondern genau auf den
-//  Neigungen, bei denen die Auswahl später auslöst (SELECT_GAMMA/SELECT_BETA).
+//  Neigungen, bei denen die Auswahl später auslöst (SELECT_GAMMA/SELECT_BETA_OBEN/SELECT_BETA_UNTEN).
 //  Das Üben trifft damit dieselbe Bewegung, die danach zählt.
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -526,7 +574,10 @@ const lctx = lehreCanvas.getContext('2d');
 const lehreText = byId('lehreText');
 
 const LEHRE_RANGE_X = SELECT_GAMMA;
-const LEHRE_RANGE_Y = SELECT_BETA;
+// Asymmetrisch wie die Auswahl selbst: nach oben mehr Spielraum als nach
+// unten (s. SELECT_BETA_OBEN/SELECT_BETA_UNTEN).
+const LEHRE_RANGE_Y_OBEN = SELECT_BETA_OBEN;
+const LEHRE_RANGE_Y_UNTEN = SELECT_BETA_UNTEN;
 
 const LEHRE_PAD = 92;
 
@@ -543,10 +594,10 @@ const LEHRE_HOLD = 900;
 const LEHRE_FADE = 600;
 
 const LEHRE_ECKEN = [
-    { id: 'obenLinks', gamma: -SELECT_GAMMA, beta: -SELECT_BETA },
-    { id: 'obenRechts', gamma: SELECT_GAMMA, beta: -SELECT_BETA },
-    { id: 'untenRechts', gamma: SELECT_GAMMA, beta: SELECT_BETA },
-    { id: 'untenLinks', gamma: -SELECT_GAMMA, beta: SELECT_BETA }
+    { id: 'obenLinks', gamma: -SELECT_GAMMA, beta: -SELECT_BETA_OBEN },
+    { id: 'obenRechts', gamma: SELECT_GAMMA, beta: -SELECT_BETA_OBEN },
+    { id: 'untenRechts', gamma: SELECT_GAMMA, beta: SELECT_BETA_UNTEN },
+    { id: 'untenLinks', gamma: -SELECT_GAMMA, beta: SELECT_BETA_UNTEN }
 ];
 
 // Mitte halten
@@ -566,6 +617,7 @@ let isLehreVisible = true;
 const intro = byId('intro');
 const introShake = createLongShake();
 let isIntroVisible = false;
+let introDismissing = false; // Abblenden läuft, aber der Nullpunkt steht noch nicht neu
 let lehreW = 0;
 let lehreH = 0;
 let lehreTargetX = 0;
@@ -594,14 +646,26 @@ function sizeLehreCanvas() {
     lctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
-/** Rechnet eine Neigung in einen Punkt auf der Fläche um. */
+/**
+ * Rechnet eine Neigung in einen Punkt auf der Fläche um.
+ *
+ * Symmetrisch um die Mitte der Fläche, nicht proportional über den ganzen
+ * (oben/unten unterschiedlich großen) Bereich verteilt: Sonst liegt die
+ * Mitte (gamma=0, beta=0) nicht in der Mitte der Fläche, sondern verschoben
+ * zur größeren der beiden Beta-Schwellen hin — genau wie bei der Bubble der
+ * Hauptauswahl (moveBubble) bleibt die Ruhelage hier immer die Bildmitte,
+ * unabhängig davon, wie weit jede Richtung bis zum Rand reicht.
+ */
 function lehrePos(gamma, beta) {
     const g = clamp(gamma, -LEHRE_RANGE_X, LEHRE_RANGE_X);
-    const b = clamp(beta, -LEHRE_RANGE_Y, LEHRE_RANGE_Y);
+    const b = clamp(beta, -LEHRE_RANGE_Y_OBEN, LEHRE_RANGE_Y_UNTEN);
+
+    const halfW = lehreW / 2 - LEHRE_PAD;
+    const halfH = lehreH / 2 - LEHRE_PAD;
 
     return {
-        x: LEHRE_PAD + ((g + LEHRE_RANGE_X) / (2 * LEHRE_RANGE_X)) * (lehreW - 2 * LEHRE_PAD),
-        y: LEHRE_PAD + ((b + LEHRE_RANGE_Y) / (2 * LEHRE_RANGE_Y)) * (lehreH - 2 * LEHRE_PAD)
+        x: lehreW / 2 + (g / LEHRE_RANGE_X) * halfW,
+        y: lehreH / 2 + (b / (b < 0 ? LEHRE_RANGE_Y_OBEN : LEHRE_RANGE_Y_UNTEN)) * halfH
     };
 }
 
@@ -617,7 +681,7 @@ function lehreEntzerrt(wert, bereich) {
 function moveLehreCursor(dGamma, dBeta) {
     const ziel = lehrePos(
         lehreEntzerrt(dGamma, LEHRE_RANGE_X),
-        lehreEntzerrt(dBeta, LEHRE_RANGE_Y)
+        lehreEntzerrt(dBeta, dBeta < 0 ? LEHRE_RANGE_Y_OBEN : LEHRE_RANGE_Y_UNTEN)
     );
     lehreTargetX = ziel.x;
     lehreTargetY = ziel.y;
@@ -630,15 +694,18 @@ function moveLehreCursor(dGamma, dBeta) {
     }
 }
 
+/** Umkehrung von lehrePos — dieselbe Mitte, dieselbe Aufteilung je Richtung. */
 function lehreTilt() {
     if (!lehreW || !lehreH) return { gamma: 0, beta: 0 };
 
-    const breite = lehreW - 2 * LEHRE_PAD;
-    const hoehe = lehreH - 2 * LEHRE_PAD;
+    const halfW = lehreW / 2 - LEHRE_PAD;
+    const halfH = lehreH / 2 - LEHRE_PAD;
+    const dx = lehreCursorX - lehreW / 2;
+    const dy = lehreCursorY - lehreH / 2;
 
     return {
-        gamma: ((lehreCursorX - LEHRE_PAD) / breite) * 2 * LEHRE_RANGE_X - LEHRE_RANGE_X,
-        beta: ((lehreCursorY - LEHRE_PAD) / hoehe) * 2 * LEHRE_RANGE_Y - LEHRE_RANGE_Y
+        gamma: (dx / halfW) * LEHRE_RANGE_X,
+        beta: (dy / halfH) * (dy < 0 ? LEHRE_RANGE_Y_OBEN : LEHRE_RANGE_Y_UNTEN)
     };
 }
 
@@ -652,16 +719,16 @@ function lehreIstBeiMitte() {
  * null.
  *
  * Geprüft wird mit denselben Regeln wie in der Station (`evaluateSelection`):
- * Für eine Ecke müssen beide Achsen ihre Schwelle erreichen, und die kleinere
- * von beiden entscheidet; für die Mitte muss die größere unter CENTER_RATIO
- * liegen. Ein Abstand in Bildpunkten täte das nicht – ein Kreis um den Punkt
- * ragt zur Mitte hin über die Schwellen hinaus, und die Übung löste dadurch
- * früher aus als der Inhalt danach.
+ * Für eine Ecke muss die stärkere Achse ihre Schwelle voll erreichen, die
+ * schwächere genügt mit RELEASE_RATIO; für die Mitte muss die größere unter
+ * CENTER_RATIO liegen. Ein Abstand in Bildpunkten täte das nicht – ein Kreis
+ * um den Punkt ragt zur Mitte hin über die Schwellen hinaus, und die Übung
+ * löste dadurch früher aus als der Inhalt danach.
  */
 function lehreZielUnterZeiger() {
     const { gamma, beta } = lehreTilt();
     const ratioSide = Math.abs(gamma) / SELECT_GAMMA;
-    const ratioLevel = Math.abs(beta) / SELECT_BETA;
+    const ratioLevel = Math.abs(beta) / selectBetaFor(beta);
 
     if (lehreIstBeiMitte()) {
         const rest = Math.max(ratioSide, ratioLevel);
@@ -673,10 +740,13 @@ function lehreZielUnterZeiger() {
     if (!ecke || lehreErreicht.has(ecke.id)) return null;
 
     const reach = Math.min(ratioSide, ratioLevel);
+    const rest = Math.max(ratioSide, ratioLevel);
 
-    // Eine angefangene Ecke übersteht ein bisschen Wackeln
-    const schwelle = ecke.id === lehreHoldId ? RELEASE_RATIO : 1;
-    return reach >= schwelle ? ecke : null;
+    // Eine angefangene Ecke übersteht ein bisschen Wackeln. Zum Einsteigen
+    // reicht wie in der Station (evaluateSelection) die stärkere Achse am
+    // Anschlag, die schwächere genügt mit RELEASE_RATIO.
+    if (ecke.id === lehreHoldId) return reach >= RELEASE_RATIO ? ecke : null;
+    return (rest >= 1 && reach >= RELEASE_RATIO) ? ecke : null;
 }
 
 
@@ -831,21 +901,26 @@ function showIntro() {
 }
 
 function dismissIntro() {
-    if (!isIntroVisible) return;
+    if (!isIntroVisible || introDismissing) return;
+    introDismissing = true;
 
-    isIntroVisible = false;
     // Erst jetzt darf die Collage unter dem ausblendenden Intro erscheinen.
     stage.classList.remove('is-covered');
     intro.classList.add('is-gone');
 
     // Nach dem Schütteln liegt das Gerät neu in der Hand: Der Nullpunkt wird
-    // erst gesetzt, wenn die Bewegung abgeklungen ist.
+    // erst gesetzt, wenn die Bewegung abgeklungen ist. Bis dahin bleibt
+    // isIntroVisible absichtlich noch true – sonst läuft die Hauptauswahl in
+    // der Pause schon mit dem alten Nullpunkt mit und der Zeiger springt beim
+    // tatsächlichen Zurücksetzen mitten in der Bedienung auf die neue Mitte.
     setTimeout(() => {
         gammaBase.reset();
         betaBase.reset();
         gammaJump.reset();
         betaJump.reset();
-        resetIdle();
+        smoothReady = false;
+        isIntroVisible = false;
+        introDismissing = false;
     }, SETTLE_DELAY);
 }
 
@@ -903,8 +978,10 @@ lehre.addEventListener('mousemove', (event) => {
 });
 
 window.addEventListener('resize', sizeLehreCanvas);
+window.addEventListener('resize', sizeBubbleRange);
 lehreText.textContent = LEHRE_TEXT_ECKEN;
 sizeLehreCanvas();
+sizeBubbleRange();
 lehreCursorX = lehreW / 2;
 lehreCursorY = lehreH / 2;
 lehreTargetX = lehreW / 2;

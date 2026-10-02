@@ -711,8 +711,8 @@ function showSummary() {
     stage.classList.add('is-summary');
     stage.classList.remove('is-announcing');
 
-    // Der Überblick bleibt stehen, bis geschüttelt oder geklickt wird – kein
-    // automatischer Rückweg.
+    // Der Überblick bleibt stehen, bis langes Schütteln zur Gesamtübersicht
+    // zurückführt — kein automatischer Rückweg, kein Neustart hier.
 }
 
 // Reset bei Verbindungsverlust
@@ -859,11 +859,6 @@ function startRound(number) {
     displayQuestion();
 }
 
-// Von vorn beginnen – mit der Ansage der ersten Runde, wie nach dem Intro.
-function startGame() {
-    announceRound(1);
-}
-
 // Der Kasten in der Mitte, der gerade sichtbar ist – nur er wird beschrieben
 // und bewegt.
 function activeQuestionBox() {
@@ -935,22 +930,33 @@ const calibration = initCalibration({
 // die es mitzählt, solange eine Station geöffnet ist, und dann zu sich
 // zurückholt. Sie hört dieselben Ereignisse; ein zweiter Zähler an dieser
 // Stelle käme ihr nur in die Quere.
+// Ein hier verbrauchtes Schütteln (Einführung/Runden-Ankündigung schließen,
+// Spiel aus dem Überblick starten) zählt sonst im Sucher auf dem Handy
+// unbemerkt mit zum langen Schütteln, das zurück zur Übersicht führt — ein
+// paar dieser kurzen Gesten hintereinander reichen dafür schon aus. Der
+// Zähler dort wird deshalb bei jeder hier verbrauchten Geste zurückgesetzt.
+function consumeShakeLocally() {
+    socket.emit('customAction', { type: 'sucherResetReturnShake' });
+}
+
 socket.on('shake', () => {
     if (calibration.isActive()) return;
 
     if (isIntroVisible) {
-        if (startShake.register()) dismissIntro();
+        if (startShake.register()) { consumeShakeLocally(); dismissIntro(); }
         return;
     }
 
     if (pendingSplashDismiss && Date.now() >= splashReadyAt) {
         const dismiss = pendingSplashDismiss;
         pendingSplashDismiss = null;
+        consumeShakeLocally();
         shakeOutSplash(dismiss);
         return;
     }
 
-    if (stage.classList.contains('is-summary')) startGame();
+    // Im Überblick löst ein einfaches Schütteln nichts mehr aus — der bleibt
+    // stehen, bis langes Schütteln zur Gesamtübersicht zurückführt.
 });
 
 // Startzustand: Das Spielfeld steht schon, gespielt wird noch nicht. Zu sehen
@@ -986,7 +992,7 @@ const lctx = introCanvas.getContext('2d');
 
 const LEHRE_PAD = 92;          // Abstand der Punkte vom Rand der Fläche
 const LEHRE_DEAD_ZONE = 2.5;   // gegen das Wackeln der Ruhelage
-const LEHRE_SMOOTHING = 0.08;  // der Zeiger zieht der Neigung nur gedämpft nach
+const LEHRE_SMOOTHING = 0.04;  // der Zeiger zieht der Neigung nur gedämpft nach — war zu direkt, zitterte mit dem Rauschen der Rohwerte mit
 const LEHRE_DOT = 46;          // Durchmesser der Punkte
 
 const LEHRE_RING_WEIT = 150;   // Außendurchmesser des Halte-Rings am Anfang
@@ -1278,8 +1284,9 @@ intro.addEventListener('click', () => {
     dismissIntro();
 });
 
-// Klick-Fallback für das Runden-Overlay und den Überblick: ersetzt das
-// Schütteln, wenn kein Gerät verbunden ist.
+// Klick-Fallback für das Runden-Overlay: ersetzt das Schütteln, wenn kein
+// Gerät verbunden ist. Im Überblick löst ein Klick nichts mehr aus — wie
+// beim Schütteln, siehe oben.
 stage.addEventListener('click', () => {
     if (connection.hasController()) return;
     if (calibration.isActive()) return;
@@ -1290,8 +1297,6 @@ stage.addEventListener('click', () => {
         shakeOutSplash(dismiss);
         return;
     }
-
-    if (stage.classList.contains('is-summary')) startGame();
 });
 
 window.addEventListener('resize', sizeLehreCanvas);

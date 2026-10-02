@@ -19,6 +19,12 @@
             --font-text: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
             /* Breite eines abgelegten Stationsbildes */
             --piece: min(300px, 22vw);
+
+            /* Das eingescannte Papier als Fläche — ein halbdeckender weißer
+               Wasch nimmt ihm etwas Stärke, kein zusätzliches Korn obenauf. */
+            --paper-bg:
+                linear-gradient(rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.38)),
+                url('/img/interactionen/textur.jpg') center center / cover no-repeat;
         }
 
         * {
@@ -30,32 +36,17 @@
         html,
         body {
             height: 100%;
+            /* Auch hier, falls html/body durch Rundung mal nicht exakt
+               deckungsgleich sind — sonst blitzt dort ein weißer Rand auf. */
+            background: var(--paper-bg);
         }
 
         body {
             /* Ein weißes Blatt Papier: hier wird collagiert. */
-            background: #fff;
             color: var(--ink);
             font-family: var(--font-text);
             overflow: hidden;
             cursor: none;
-        }
-
-        /* Zurück-Knopf dezent oben links */
-        .back-btn {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            padding: 8px 16px;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            background: #fff;
-            color: var(--ink);
-            text-decoration: none;
-            font-size: 0.85rem;
-            font-weight: 500;
-            cursor: pointer;
-            z-index: 20;
         }
 
         /* QR-Karte, zentriert; verschwindet, sobald der Sucher am Handy läuft. */
@@ -68,7 +59,7 @@
             align-items: center;
             justify-content: center;
             gap: 20px;
-            background: #fff;
+            background: var(--paper-bg);
             transition: opacity 0.6s ease;
         }
 
@@ -77,13 +68,35 @@
             pointer-events: none;
         }
 
+        /* Direkt beim Parsen gesetzt (Script unten), bevor überhaupt etwas
+           gemalt ist — ohne Übergang, damit der Code beim Reload einer schon
+           verbundenen Sitzung nicht kurz aufblitzt. */
+        .connect[hidden] {
+            display: none;
+        }
+
+        /* Eigens positioniert statt im zentrierten Flex-Block: so sitzt er
+           deutlich höher als QR-Karte und Text, unabhängig von deren Mitte.
+           top in vh, damit er auf jeder Bildschirmhöhe im selben Abstand zum
+           Rand bleibt statt an der QR-Karte kleben zu bleiben. */
+        .connect-title {
+            position: absolute;
+            top: clamp(24px, 10vh, 120px);
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(90%, 40em);
+            font-size: clamp(1.6rem, 4vw, 2.4rem);
+            font-weight: 600;
+            text-align: center;
+            line-height: 1.3;
+        }
+
         .qr {
             width: 240px;
             height: 240px;
             border-radius: 16px;
             padding: 12px;
             background: #fff;
-            border: 1px solid var(--border);
         }
 
         .qr img {
@@ -94,7 +107,8 @@
 
         .connect p {
             font-size: 0.95rem;
-            color: var(--muted);
+            color: var(--ink);
+            text-transform: lowercase;
         }
 
         /* ── Die Collage ───────────────────────────────────────────────────
@@ -115,7 +129,7 @@
             transform: translate(-50%, -50%) scale(1);
             /* Noch nicht betreten: das Bild liegt erst als Entwurf auf dem
                Blatt. Nach der Station steht es in voller Farbe. */
-            opacity: 1; /* Test: alle Key-Visuals farbig (sonst 0.45, bis Station done) */
+            opacity: 0.45;
             transition: opacity 0.6s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
         }
 
@@ -124,7 +138,8 @@
             opacity: 0;
         }
 
-        .piece.done {
+        .piece.done,
+        .piece.revealed {
             opacity: 1;
         }
 
@@ -205,15 +220,16 @@
             transform: translate(-50%, -50%);
         }
 
+        /* Der Kringel (kringel2.png), dieselbe Handschrift wie in den übrigen
+           Stationen: eine SVG-Maske legt das Bild beim Halten schrittweise
+           frei (stroke-dashoffset, gesetzt von sucher.js). viewBox = PNG-Größe. */
         .cursor-ring {
             position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-        }
-
-        #cursorProgress {
-            transition: stroke-dasharray 0.1s linear;
+            left: 50%;
+            top: 50%;
+            width: 130px;
+            height: auto;
+            transform: translate(-50%, -50%);
         }
 
         /* Die wenigen Hinweise, die das Blatt trägt. */
@@ -226,7 +242,6 @@
             font-size: 1.05rem;
             font-weight: 400;
             color: var(--accent);
-            text-transform: lowercase;
             pointer-events: none;
             opacity: 0;
             transition: opacity 0.3s ease;
@@ -244,8 +259,13 @@
             width: 100%;
             height: 100%;
             border: 0;
-            background: #fff;
+            /* Eigener Hintergrund fürs Einblenden, bevor das Dokument der
+               Station selbst gemalt hat — sonst blitzt dort kurz ein weißer
+               Rand auf, wo die Station noch nicht geladen ist. */
+            background: var(--paper-bg);
             opacity: 0;
+            /* Dauer fürs Einblenden; beim Verlassen setzt sucher.js eine
+               eigene, langsamere Transition inline (STATION_FADE_MS). */
             transition: opacity 0.4s ease;
             z-index: 15;
         }
@@ -254,13 +274,60 @@
             display: none;
         }
 
+        /* Reset-Button oben rechts: klein, unauffällig, nur per Handhaltung
+           (Sucher-Cursor) ansteuerbar — kein Maus-/Touch-Ziel. Der Fortschritt
+           füllt sich von links nach rechts, bewusst langsam. */
+        .reset-btn {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            z-index: 14;
+            padding: 7px 14px;
+            font-family: var(--font-text);
+            font-size: 0.72rem;
+            font-weight: 500;
+            letter-spacing: 0.01em;
+            color: var(--ink);
+            background: #ffffff;
+            border: 1px solid var(--ink);
+            border-radius: 999px;
+            overflow: hidden;
+            opacity: 0.5;
+            transition: opacity 0.25s ease;
+        }
+
+        .reset-btn[hidden] {
+            display: none;
+        }
+
+        .reset-btn.is-active {
+            opacity: 1;
+        }
+
+        .reset-btn-fill {
+            position: absolute;
+            inset: 0;
+            width: 0%;
+            background: rgba(15, 23, 42, 0.18);
+        }
+
+        .reset-btn-label {
+            position: relative;
+            z-index: 1;
+            text-transform: lowercase;
+            white-space: nowrap;
+        }
+
     </style>
 </head>
 
 <body>
-    <a href="/einstieg.html" class="back-btn">← Einstieg</a>
-
     <div class="sheet" id="sheet" hidden></div>
+
+    <button class="reset-btn" id="resetBtn" type="button" tabindex="-1" aria-hidden="true" hidden>
+        <span class="reset-btn-fill" id="resetBtnFill"></span>
+        <span class="reset-btn-label">alles zurücksetzen</span>
+    </button>
 
     <img class="carried" id="carried" alt="" hidden>
 
@@ -270,20 +337,39 @@
          Keyvisual getragen wird. sucher.js tauscht die Quelle. -->
     <div class="cursor" id="cursor" aria-hidden="true">
         <img class="cursor-hand" id="cursorHand" src="/img/interactionen/einstieg/cursor_drop.png" alt="">
-        <!-- Halte-Fortschritt: füllt sich beim Ablegen, sobald ruhig gehalten wird. -->
-        <svg class="cursor-ring" viewBox="0 0 48 48">
-            <circle id="cursorProgress" cx="24" cy="24" r="21" fill="none" stroke="var(--accent)"
-                stroke-width="3" stroke-linecap="round" stroke-dasharray="0 1000"
-                transform="rotate(-90 24 24)" />
+        <!-- Halte-Fortschritt: der Kringel zeichnet sich fort, sobald ruhig
+             gehalten wird. stroke-dashoffset setzt sucher.js. -->
+        <svg class="cursor-ring" viewBox="0 0 499 307" aria-hidden="true">
+            <defs>
+                <mask id="cursorKringelMask">
+                    <path id="cursorKringelPath"
+                        d="M331.5 70.5L330 65C330 65 287.5 50 258.5 51.5C229.5 53 161.511 63.7435 110.5 96C76.3959 117.566 49.0001 132 34.5002 166C20.0004 200 30.0002 214 30.0002 214C30.0002 214 48 268.5 141 284.5C234 300.5 269.5 289 269.5 289C269.5 289 378.718 274.937 422 227.5C445.036 202.254 466.774 185.1 464.5 151C462 113.5 446.5 97.5 417 68C387.5 38.5 321.5 31 321.5 31L239.5 24H181"
+                        stroke="#fff" fill="none" stroke-width="26" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                </mask>
+            </defs>
+            <image href="/img/interactionen/transportmechanismen/kringel2.png" width="499" height="307"
+                mask="url(#cursorKringelMask)" />
         </svg>
     </div>
 
     <iframe class="station" id="station" hidden title="Station"></iframe>
 
     <div class="connect" id="connect">
+        <h1 class="connect-title">Hybrider Lernraum:<br>Mikroplastik in Böden</h1>
         <div class="qr"><img id="qrImage" src="" alt="QR-Code"></div>
         <p>Scanne den Code, um den Sucher auf dem Handy zu öffnen</p>
     </div>
+    <script>
+        // War beim letzten Mal schon ein Handy verbunden, den QR-Code gar nicht
+        // erst malen — sonst blitzt er beim Reload kurz auf, bis sucher.js den
+        // echten Status vom Server hat. sucher.js hebt dies bei Bedarf wieder auf.
+        try {
+            if (localStorage.getItem('sucherConnected') === '1') {
+                document.getElementById('connect').hidden = true;
+            }
+        } catch (e) { /* Privatmodus */ }
+    </script>
 
     <script src="/socket.io/socket.io.js"></script>
     <script type="module" src="/js/sucher.js"></script>

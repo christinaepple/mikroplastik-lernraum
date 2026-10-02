@@ -104,6 +104,12 @@ const SPRINKLE_STEP = 6;       // Grad je weiterem Objekt
 const SPRINKLE_COLUMNS = 8;
 const SPRINKLE_ROWS = 7;
 const SPRINKLE_JITTER = 0.9;   // Anteil der Zelle, um den ein Platz wandert
+// Die Haufen sind schmal (ein Sechstel ihrer Höhe breit) – zu schmal, um von
+// der äußersten Spaltenmitte aus seitlich noch bis an den Rand zu reichen.
+// Das Raster deshalb etwas über 0..1 hinausstrecken (von der Mitte aus
+// skaliert, innere Zellen rücken kaum, äußere spürbar weiter an bzw. über
+// den Rand).
+const SPRINKLE_OVERSCAN = 1.2;
 const SPRINKLE_TILT = 45;      // Grad, um die ein Objekt gedreht liegt
 // Die Objekte sind ein Vielfaches ihrer Rasterzelle groß: Jedes reicht weit in
 // die Nachbarzellen hinein, sodass sich am Ende alles überlagert und nur noch
@@ -371,8 +377,10 @@ function buildSprinkles() {
         const row = Math.floor(slot / SPRINKLE_COLUMNS);
         const seed = slot * 37 + 11;
 
-        const x = (col + 0.5 + (noise(seed) - 0.5) * SPRINKLE_JITTER) / SPRINKLE_COLUMNS;
-        const y = (row + 0.5 + (noise(seed + 0.4) - 0.5) * SPRINKLE_JITTER) / SPRINKLE_ROWS;
+        const xCell = (col + 0.5) / SPRINKLE_COLUMNS;
+        const yCell = (row + 0.5) / SPRINKLE_ROWS;
+        const x = 0.5 + (xCell - 0.5) * SPRINKLE_OVERSCAN + (noise(seed) - 0.5) * SPRINKLE_JITTER / SPRINKLE_COLUMNS;
+        const y = 0.5 + (yCell - 0.5) * SPRINKLE_OVERSCAN + (noise(seed + 0.4) - 0.5) * SPRINKLE_JITTER / SPRINKLE_ROWS;
         const tilt = (noise(seed + 0.8) - 0.5) * 2 * SPRINKLE_TILT;
         const size = SPRINKLE_SIZE[0] + noise(seed + 1.2) * (SPRINKLE_SIZE[1] - SPRINKLE_SIZE[0]);
         const file = SPRINKLE_FILES[Math.floor(noise(seed + 1.6) * SPRINKLE_FILES.length) % SPRINKLE_FILES.length];
@@ -615,7 +623,14 @@ socket.on('shake', () => {
 
     if (isIntroVisible) {
         dismissIntro();
-    } else {
-        resetTimeline();
+        return;
     }
+
+    // Fertig durchgedreht: das Schütteln gehört jetzt dem längeren Rückkehr-
+    // Schütteln zur Übersicht (sucher.js/controller_sucher.js) — hier gibt es
+    // nichts mehr zurückzusetzen, sonst verschwindet das fertige Bild genau
+    // während man aktiv rausschüttelt.
+    if (isFinished) return;
+
+    resetTimeline();
 });

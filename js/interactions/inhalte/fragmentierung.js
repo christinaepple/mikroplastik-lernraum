@@ -13,6 +13,7 @@ import { socket } from '../../lib/socket.js';
 import { initConnectionBadge } from '../../lib/connection.js';
 import { clamp } from '../../lib/angles.js';
 import { initCalibration } from '../../lib/calibration.js';
+import { reportCompletion } from '../../lib/completion.js';
 import { byId } from '../../lib/dom.js';
 
 const stage = byId('stage');
@@ -170,6 +171,7 @@ function nextFrame() {
     if (storyIndex >= STORY_FRAMES.length) {
         finished = true;
         revealAllDecayLabels();
+        reportCompletion({ label: 'Bildfolge durchlaufen' });
         return;
     }
     showFrame(storyIndex);

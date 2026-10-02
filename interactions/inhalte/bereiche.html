@@ -33,6 +33,13 @@
                Inhalts-Stationen. */
             --font-head: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
             --font-text: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+
+            /* Das eingescannte Papier als Fläche, wie im Sucher: ein
+               halbdeckender weißer Wasch nimmt ihm etwas Stärke, kein
+               zusätzliches Korn obenauf. */
+            --paper-bg:
+                linear-gradient(rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.38)),
+                url('/img/interactionen/textur.jpg') center center / cover no-repeat;
         }
 
         * {
@@ -44,16 +51,16 @@
         html,
         body {
             height: 100%;
+            background: var(--paper-bg);
         }
 
         /* Das Modul füllt das Fenster; ein begrenzender Rand um die Fläche
-           kostet nur Platz – dieselbe Entscheidung wie beim eingebetteten
+           kostet nur Platz — dieselbe Entscheidung wie beim eingebetteten
            Modul in der Landkarte. */
         body {
             font-family: var(--font-text);
             font-weight: 400;
             line-height: 1.5;
-            background-color: var(--bg-card);
             color: var(--text-main);
             display: flex;
             flex-direction: column;
@@ -160,7 +167,7 @@
         /* Game Workspace */
         .workspace {
             position: relative;
-            background: var(--bg-card);
+            background: var(--paper-bg);
             flex: 1;
             min-height: 0;
             display: flex;
@@ -359,7 +366,7 @@
             position: absolute;
             inset: 0;
             z-index: 30;
-            background: var(--bg-card);
+            background: var(--paper-bg);
             transition: opacity 0.6s ease;
         }
 
@@ -447,38 +454,6 @@
             transform: translateX(-50%);
             white-space: nowrap;
             font-family: var(--font-head);
-        }
-
-        /* ── Hinweis bei Inaktivität ───────────────────────────────────
-           Erscheint erst, wenn eine Weile nichts passiert: Wer weiß, wie es
-           weitergeht, soll ihn nie zu sehen bekommen. */
-        .idle-overlay {
-            position: fixed;
-            inset: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(248, 250, 252, 0.88);
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.4s ease;
-            z-index: 60;
-        }
-
-        .idle-overlay.visible {
-            opacity: 1;
-        }
-
-        .idle-box {
-            max-width: 520px;
-            padding: 28px 32px;
-            background: #ffffff;
-            border-radius: 16px;
-            box-shadow: 0 8px 20px -6px rgba(0, 0, 0, 0.12);
-            text-align: left;
-            font-size: 1.1rem;
-            line-height: 1.7;
-            color: var(--text-main);
         }
 
         /* Rückmeldung richtig/falsch – liegt über der ganzen Seite, nicht mehr
@@ -610,11 +585,6 @@
 
     <!-- Rückmeldung richtig/falsch über die ganze Seite -->
     <div class="flash" id="flash"></div>
-
-    <!-- Hinweis bei Inaktivität, ebenfalls über die ganze Seite -->
-    <div class="idle-overlay" id="idleOverlay">
-    <div class="idle-box" id="idleText"></div>
-    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script type="module" src="/js/interactions/inhalte/bereiche.js"></script>

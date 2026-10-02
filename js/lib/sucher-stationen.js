@@ -50,6 +50,11 @@ export const STATIONEN = [
         img: '/img/interactionen/einstieg/4_frag.png',
         stroke: '/img/interactionen/einstieg/4_frag_stroke.png',
         fund: { deg: -95, dist: 0.68 },
+        // Einführungsspiel und Bildfolge laufen über anhaltendes Schütteln –
+        // das käme dem langen Rückkehr-Schütteln (controller_sucher.js) in die
+        // Quere. Bis die Station ihren Abschluss meldet, zählt hier keine
+        // Schüttel-Geste fürs Zurückkehren.
+        holdReturnShake: true,
     },
     {
         name: 'Eintragspfade',

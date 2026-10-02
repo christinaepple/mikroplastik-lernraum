@@ -775,20 +775,24 @@ function drawStepLabel() {
     const cx = sceneX((SOIL_ZONE.left + SOIL_ZONE.right) / 2);
     const cy = sceneY(SOIL_ZONE.bottom + LABEL_UNDER_SOIL);
 
-    const padX = 14;
-    const padY = 9;
-    ctx.font = '400 18px "Inclusive Sans", "Helvetica Neue", Helvetica, Arial, sans-serif';
+    // Die Szene wird responsiv eingepasst. Damit der Erklärungstext dabei
+    // dieselbe Proportion und Lage zur Collage behält, skalieren auch Schrift,
+    // Innenabstand und Rahmen mit der Szene statt mit festen Bildschirm-Pixeln.
+    const fontSize = 18 * SCENE_SCALE;
+    const padX = 14 * SCENE_SCALE;
+    const padY = 9 * SCENE_SCALE;
+    ctx.font = `400 ${fontSize}px "Inclusive Sans", "Helvetica Neue", Helvetica, Arial, sans-serif`;
     const width = ctx.measureText(text).width + padX * 2;
-    const height = 18 + padY * 2;
+    const height = fontSize + padY * 2;
     const left = cx - width / 2;
     const top = cy - height / 2;
 
     ctx.beginPath();
-    ctx.roundRect(left, top, width, height, 11);
+    ctx.roundRect(left, top, width, height, 11 * SCENE_SCALE);
     ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
     ctx.fill();
     ctx.strokeStyle = LABEL_CORAL;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 3 * SCENE_SCALE;
     ctx.stroke();
 
     ctx.fillStyle = LABEL_CORAL_DEEP;

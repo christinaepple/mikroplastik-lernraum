@@ -24,15 +24,30 @@ function handleRequest(req, res) {
         const protocol = server instanceof https.Server ? 'https' : 'http';
         let localIp = 'localhost';
 
+        // VPN-Tunnel (utun/tun/ppp/tap) liefern selbst eine nicht-interne IPv4-
+        // Adresse, sind vom Handy im selben WLAN aber nicht erreichbar — das
+        // innere `break` verließ zudem nur die innere Schleife, sodass am Ende
+        // ohnehin die letzte gefundene Adresse gewann statt der ersten. Daher
+        // zuerst eine echte LAN-Adresse suchen, nur ohne Treffer auf den Tunnel
+        // zurückfallen.
         const nets = require('os').networkInterfaces();
-        for (const iface of Object.values(nets)) {
+        let tunnelIp = null;
+        outer:
+        for (const [name, iface] of Object.entries(nets)) {
+            if (/^(utun|tun|tap|ppp)/.test(name)) {
+                for (const net of iface) {
+                    if (net.family === 'IPv4' && !net.internal && !tunnelIp) tunnelIp = net.address;
+                }
+                continue;
+            }
             for (const net of iface) {
                 if (net.family === 'IPv4' && !net.internal) {
                     localIp = net.address;
-                    break;
+                    break outer;
                 }
             }
         }
+        if (localIp === 'localhost' && tunnelIp) localIp = tunnelIp;
 
         // Origin für den QR-Code:
         //  1. ausdrücklich gesetzt (PUBLIC_ORIGIN) – z. B. eigene Domain,
@@ -170,6 +185,9 @@ function applySucherState(s, data) {
     if (!data) return;
     if (data.type === 'sucherPlaced') {
         s.placed.push({ index: data.index, x: data.x, y: data.y, done: false });
+    } else if (data.type === 'sucherReveal') {
+        const p = s.placed.find((q) => q.index === data.index);
+        if (p) p.revealed = true;
     } else if (data.type === 'sucherEnter') {
         s.phase = 'station';
         s.activeIndex = data.index;
@@ -184,6 +202,12 @@ function applySucherState(s, data) {
         // nicht als durchgespielt (currentIndex/placed bleiben unberührt).
         s.phase = 'sucher';
         s.activeIndex = -1;
+    } else if (data.type === 'sucherResetAll') {
+        // Reset-Button auf der Übersicht: der gesamte Ablauf beginnt von vorn.
+        s.currentIndex = 0;
+        s.phase = 'sucher';
+        s.activeIndex = -1;
+        s.placed = [];
     }
     // sucherAim / sucherReturnProgress u. a. sind flüchtig – nichts zu speichern.
 }

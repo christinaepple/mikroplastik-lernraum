@@ -42,6 +42,13 @@
                Inhalts-Stationen. */
             --font-head: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
             --font-text: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+
+            /* Das eingescannte Papier als Fläche, wie im Sucher: ein
+               halbdeckender weißer Wasch nimmt ihm etwas Stärke, kein
+               zusätzliches Korn obenauf. */
+            --paper-bg:
+                linear-gradient(rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.38)),
+                url('/img/interactionen/textur.jpg') center center / cover no-repeat;
         }
 
         * {
@@ -53,6 +60,7 @@
         html,
         body {
             height: 100%;
+            background: var(--paper-bg);
         }
 
         /* Das Modul füllt das Fenster; ein begrenzender Rand um die Fläche
@@ -61,7 +69,6 @@
             font-family: var(--font-text);
             font-weight: 400;
             line-height: 1.5;
-            background-color: var(--bg-card);
             color: var(--text-main);
             display: flex;
             flex-direction: column;
@@ -339,44 +346,9 @@
             left: 87.5%;
         }
 
-        .stage.is-summary.is-announcing .summary-hint {
-            opacity: 0;
-            transition-delay: 0s;
-        }
-
-        /* Wie es weitergeht, steht unter der Reihe – nicht in ihr. Die vier
-           Karten sind das Ergebnis, der Hinweis ist die Bedienung, und beides
-           soll sich nicht ins Gehege kommen.
-           Er kommt mit der Reihe und geht mit ihr: Solange gespielt wird, ist
-           er nicht da. */
-        .summary-hint {
-            position: absolute;
-            bottom: 13%;
-            left: 50%;
-            transform: translateX(-50%);
-            width: min(560px, 80%);
-            text-align: center;
-            line-height: 1.7;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.6s ease;
-            /* Liegt über dem unteren Banner – sonst deckt dessen Bildfläche
-               den Text ab, wo sich beide überlappen. */
-            z-index: 1;
-            /* Farbe, Größe und Kleinschreibung: Klasse `instruction` */
-        }
-
-        /* Einen Atemzug nach der Reihe: erst das Ergebnis, dann die Frage, wie
-           es weitergeht. */
-        .stage.is-summary .summary-hint {
-            opacity: 1;
-            transition-delay: 0.5s;
-        }
-
-        /* Handschriftlicher Rahmen um den Überblick, dieselbe Logik wie
-           .summary-hint: kommt mit der Reihe und geht mit ihr. Die Bilder
-           sind breite Bänder (Seitenverhältnis ~5:1) und laufen über die
-           ganze Breite der Bühne. */
+        /* Handschriftlicher Rahmen um den Überblick: kommt mit der Reihe und
+           geht mit ihr. Die Bilder sind breite Bänder (Seitenverhältnis ~5:1)
+           und laufen über die ganze Breite der Bühne. */
         .summary-ende {
             position: absolute;
             left: 50%;
@@ -442,7 +414,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: var(--bg-card);
+            background: var(--paper-bg);
             transition: opacity 0.5s ease;
         }
 
@@ -968,10 +940,6 @@
 
         <!-- Schnipsel-Hintergrund für die Runde-1-Ankündigung -->
         <div id="roundSplash" class="round-splash"></div>
-
-        <!-- Steht unter dem Überblick und nur dort -->
-        <p class="summary-hint instruction">Schüttle, um noch einmal zu beginnen.
-            Langes Schütteln führt zurück auf die Karte.</p>
 
         <!-- Handschriftlicher Abschluss, nur im Überblick sichtbar -->
         <img class="summary-ende summary-ende-top" src="/img/interactionen/groessen/endeOben.png" alt="">

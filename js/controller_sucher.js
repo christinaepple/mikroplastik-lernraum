@@ -134,8 +134,10 @@ const BACK_COLOR = '#eaff00';
 // Zurück zur Übersicht: langes Schütteln während einer laufenden Station. Wie
 // auf der Landkarte (exitShake) eine deutlich längere Geste als die Schüttler
 // innerhalb der Stationen — bewusst so lang, dass sie nicht versehentlich fällt.
-const RETURN_SHAKE_WINDOW_MS = 2500;
-const RETURN_SHAKE_COUNT = 8;
+// War zu knapp bemessen: Ein beherztes "Schütteln zum Starten" in einer Station
+// reichte oft schon aus, um gleich mit zurück zur Übersicht zu rutschen.
+const RETURN_SHAKE_WINDOW_MS = 4000;
+const RETURN_SHAKE_COUNT = 12;
 // Während des Schüttelns die Lage an die Station einfrieren: sonst überträgt
 // sich das Rütteln auf ihr Bild. So lange nach dem letzten Schüttler bleibt sie
 // eingefroren — knapp über dem Abstand zweier Schüttel-Ereignisse.
@@ -149,10 +151,26 @@ const startBtn = byId('startBtn');
 const errorMsg = byId('errorMsg');
 const hint = byId('hint');
 const stationWait = byId('stationWait');
+const stationWaitText = byId('stationWaitText');
 const carryGuide = byId('carryGuide');
 const returnProgress = byId('returnProgress');
 const returnProgressFill = byId('returnProgressFill');
 const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+
+const helpBtn = byId('helpBtn');
+const helpSheet = byId('helpSheet');
+const helpSheetClose = byId('helpSheetClose');
+const gestureHelpBtn = byId('gestureHelpBtn');
+const calibrateBtn = byId('calibrateBtn');
+const skipStationBtn = byId('skipStationBtn');
+const resetAllBtn = byId('resetAllBtn');
+const gestureHelp = byId('gestureHelp');
+const gestureHelpClose = byId('gestureHelpClose');
+const sourcesBtn = byId('sourcesBtn');
+const sourcesSheet = byId('sourcesSheet');
+const sourcesSheetClose = byId('sourcesSheetClose');
+const sourcesFrame = byId('sourcesFrame');
+const allDone = byId('allDone');
 
 let W = 0, H = 0, DPR = 1;
 
@@ -355,9 +373,9 @@ function graySource(i) {
 // jeder abgeschlossenen Station eins weiter.
 let currentIndex = 0;
 
-// ⚠️ NUR ZUM TESTEN: Hebt die feste Reihenfolge auf — alle Bilder sind farbig und
-// aufnehmbar, in beliebiger Reihenfolge. Für den echten Ablauf wieder auf false.
-const FREE_ORDER = true;
+// Nur das nächste offene Bild (currentIndex) ist farbig und aufnehmbar; die
+// übrigen liegen schwarzweiß und fest, bis sie an der Reihe sind.
+const FREE_ORDER = false;
 
 const particles = [];
 let grabbed = null;      // aufgenommenes Bild
@@ -454,6 +472,13 @@ const sendAim = createFrameSender('customAction');
 // Zurück-zur-Übersicht-Geste (nur während einer Station).
 const returnShake = createLongShake({ windowMs: RETURN_SHAKE_WINDOW_MS, count: RETURN_SHAKE_COUNT });
 let lastStationShakeAt = 0;
+
+// Manche Stationen brauchen anhaltendes Schütteln als eigene Geste (z. B.
+// Fragmentierung, s. STATIONEN/holdReturnShake) – dort würde normales Spielen
+// sonst versehentlich die Rückkehr-Geste mitauslösen. Für solche Stationen
+// zählt kein Schütteln fürs Zurückkehren, bis die Station selbst ihren
+// Abschluss meldet (sucherFinished); danach ist die Geste wie gewohnt aktiv.
+let returnShakeLocked = false;
 
 // ─────────────────────────────────────────────
 // ZEIGER-ÜBERGABE
@@ -614,8 +639,20 @@ function updateCarry(dt) {
 // ─────────────────────────────────────────────
 let lastFrame = 0;
 
+// Alle Bilder eingesammelt: Statt der leeren Bodenansicht steht hier die
+// Abschlussmeldung. Weg, sobald wieder eine Station läuft (Wiederholung über
+// die Collage auf dem großen Bildschirm).
+let allDoneVisible = false;
+function updateAllDoneView() {
+    const done = mode === 'sucher' && currentIndex >= STATIONEN.length;
+    if (done === allDoneVisible) return;
+    allDoneVisible = done;
+    allDone.hidden = !done;
+}
+
 function render(now) {
     requestAnimationFrame(render);
+    updateAllDoneView();
 
     const dt = lastFrame ? Math.min((now - lastFrame) / 1000, 0.05) : 0.016;
     lastFrame = now;
@@ -682,11 +719,15 @@ function render(now) {
 
     for (const d of drawable) {
         drawFloorPiece(d.pt);
+        // Einloggen: der Ring ums anvisierte Keyvisual füllt sich im
+        // Uhrzeigersinn (ab oben) mit dem Haltefortschritt, statt als
+        // fertiger Kreis aufzuspringen.
         if (d.pt === grabCandidate) {
+            const p = clamp((performance.now() - grabHoldStart) / GRAB_HOLD_MS, 0, 1);
             ctx.lineWidth = 2;
             ctx.strokeStyle = ACCENT;
             ctx.beginPath();
-            ctx.arc(d.quad.c.x, d.quad.c.y, d.quad.reach + 10, 0, Math.PI * 2);
+            ctx.arc(d.quad.c.x, d.quad.c.y, d.quad.reach + 10, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2);
             ctx.stroke();
         }
     }
@@ -944,15 +985,6 @@ function drawReticle() {
         ctx.drawImage(img, cx - w / 2, cy - h / 2, w, h);
     }
 
-    // Halte-Fortschritt beim Aufnehmen, als Ring um die Hand.
-    if (grabCandidate) {
-        const p = clamp((performance.now() - grabHoldStart) / GRAB_HOLD_MS, 0, 1);
-        ctx.strokeStyle = ACCENT;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(cx, cy, CURSOR_IMG_W * 0.6, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2);
-        ctx.stroke();
-    }
 }
 
 
@@ -991,6 +1023,7 @@ function setCarryGuide(on) {
 // ─────────────────────────────────────────────
 // SENSORIK
 // ─────────────────────────────────────────────
+
 function startSensors() {
     sensorActive = true;
 
@@ -1037,6 +1070,8 @@ function startSensors() {
             // was sie in diesem Moment daraus macht.
             socket.volatile.emit('shake', { intensity: s.intensity });
             lastStationShakeAt = Date.now();
+
+            if (returnShakeLocked) return;
 
             if (returnShake.register()) {
                 returnToSucher();
@@ -1111,13 +1146,199 @@ function setChromeColor(hex) {
     if (themeColorMeta) themeColorMeta.setAttribute('content', hex);
 }
 
+const STATION_WAIT_TEXT = 'Lernstation läuft<br>Schüttel lange, um zurück zur Übersicht zu gelangen';
+const STATION_FINISHED_TEXT = 'Schüttel, um zurück zur Übersicht zu gelangen';
+
 /** Stations-Warteansicht zeigen/verbergen. Die Ansicht ist weiß wie die Übersicht,
  * daher bleiben auch die Ränder weiß. */
 function setStationWait(show) {
     stationWait.hidden = !show;
-    setChromeColor('#ffffff');
+    setStationFinished(false);
     // Beim Betreten leer, beim Verlassen weg.
     hideReturnProgress();
+    closeHelpSheet(true);
+    closeGestureHelp(true);
+    closeSources(true);
+}
+
+/**
+ * Setzt den gesamten Ablauf hier am Handy zurück: alle Bilder liegen wieder
+ * am Boden, der Ablauf beginnt beim ersten. Wird sowohl angewendet, wenn der
+ * Laptop den Reset meldet (Handhaltung auf der Übersicht), als auch direkt
+ * hier, wenn "Alles zurücksetzen" im Hilfe-Menü bestätigt wurde.
+ */
+function applyResetAll() {
+    currentIndex = 0;
+    for (const pt of particles) pt.gone = false;
+    grabbed = null;
+    resetGrabHold();
+    disarm();
+    returnShake.reset();
+    mode = 'sucher';
+    setStationWait(false);
+    lastFrame = 0;
+    showHint('Zurückgesetzt — von vorn', 3000);
+}
+
+// ─────────────────────────────────────────────
+// HILFE-MENÜ (durchgehend verfügbar, sobald der Lernraum läuft)
+// ─────────────────────────────────────────────
+// "Station überspringen" steht immer im Menü, auch außerhalb einer Station –
+// der Laptop ignoriert die Meldung dann ohnehin (skipStation() in sucher.js
+// bricht ohne aktives Stück selbst ab).
+
+let helpSheetHideTimer = 0;
+function openHelpSheet() {
+    clearTimeout(helpSheetHideTimer);
+    helpSheet.hidden = false;
+    helpSheet.style.display = 'flex';
+    void helpSheet.offsetWidth;   // Reflow, damit die Einblende-Transition greift
+    helpSheet.classList.add('is-open');
+}
+function closeHelpSheet(immediate) {
+    // Eine angefangene, aber nicht bestätigte Aktion verfällt beim Schließen.
+    resetSkipConfirm();
+    resetResetAllConfirm();
+    helpSheet.classList.remove('is-open');
+    clearTimeout(helpSheetHideTimer);
+    if (immediate) {
+        helpSheet.style.display = 'none';
+        helpSheet.hidden = true;
+        return;
+    }
+    helpSheetHideTimer = setTimeout(() => {
+        helpSheet.style.display = 'none';
+        helpSheet.hidden = true;
+    }, 340);
+}
+
+let gestureHelpHideTimer = 0;
+function openGestureHelp() {
+    closeHelpSheet(true);
+    clearTimeout(gestureHelpHideTimer);
+    gestureHelp.hidden = false;
+    gestureHelp.style.display = 'flex';
+    void gestureHelp.offsetWidth;
+    gestureHelp.classList.add('is-open');
+}
+function closeGestureHelp(immediate) {
+    gestureHelp.classList.remove('is-open');
+    clearTimeout(gestureHelpHideTimer);
+    if (immediate) {
+        gestureHelp.style.display = 'none';
+        gestureHelp.hidden = true;
+        return;
+    }
+    gestureHelpHideTimer = setTimeout(() => {
+        gestureHelp.style.display = 'none';
+        gestureHelp.hidden = true;
+    }, 340);
+}
+
+let sourcesHideTimer = 0;
+function openSources() {
+    closeHelpSheet(true);
+    // Lädt erst beim ersten Öffnen — nicht gleich beim Start der Seite.
+    if (!sourcesFrame.getAttribute('src')) {
+        sourcesFrame.src = '/interactions/inhalte/quellenverzeichnis.html';
+    }
+    clearTimeout(sourcesHideTimer);
+    sourcesSheet.hidden = false;
+    sourcesSheet.style.display = 'flex';
+    void sourcesSheet.offsetWidth;
+    sourcesSheet.classList.add('is-open');
+}
+function closeSources(immediate) {
+    sourcesSheet.classList.remove('is-open');
+    clearTimeout(sourcesHideTimer);
+    if (immediate) {
+        sourcesSheet.style.display = 'none';
+        sourcesSheet.hidden = true;
+        return;
+    }
+    sourcesHideTimer = setTimeout(() => {
+        sourcesSheet.style.display = 'none';
+        sourcesSheet.hidden = true;
+    }, 340);
+}
+
+helpBtn.addEventListener('click', openHelpSheet);
+helpSheetClose.addEventListener('click', () => closeHelpSheet(false));
+gestureHelpBtn.addEventListener('click', openGestureHelp);
+gestureHelpClose.addEventListener('click', () => closeGestureHelp(false));
+sourcesBtn.addEventListener('click', openSources);
+sourcesSheetClose.addEventListener('click', () => closeSources(false));
+
+// Kalibrierung: dieselbe Geste wie der Button in den Stationen selbst — nur
+// weiterreichen, die laufende Station (im Rahmen auf dem großen Bildschirm)
+// hört über ihre eigene shareCalibration()-Kopplung mit.
+calibrateBtn.addEventListener('click', () => {
+    socket.emit('calibrate');
+    calibrateBtn.textContent = 'Kalibriert';
+    setTimeout(() => { calibrateBtn.textContent = 'Kalibrierung'; }, 1000);
+});
+
+// Zweistufige Bestätigung für die beiden folgenreichen Aktionen: Der erste
+// Tipp "bewaffnet" den Button (Text wechselt, Akzentfarbe), erst der zweite
+// innerhalb von CONFIRM_MS löst wirklich aus. Ohne Bestätigung verfällt die
+// Bewaffnung von selbst wieder — auch beim Schließen des Menüs (s. oben).
+const CONFIRM_MS = 3000;
+function armConfirm(btn, label, confirmLabel, onConfirm) {
+    let armed = false;
+    let timer = 0;
+
+    function reset() {
+        if (!armed) return;
+        armed = false;
+        clearTimeout(timer);
+        btn.textContent = label;
+        btn.classList.remove('is-confirm');
+    }
+
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+        if (!armed) {
+            armed = true;
+            btn.textContent = confirmLabel;
+            btn.classList.add('is-confirm');
+            clearTimeout(timer);
+            timer = setTimeout(reset, CONFIRM_MS);
+            return;
+        }
+        reset();
+        onConfirm();
+    });
+
+    return reset;
+}
+
+// Station überspringen: hakt die laufende Station als erfolgreich ab, ohne
+// die Gesten dafür abzuwarten. Der Laptop (sucher.js) markiert die Station
+// als abgeschlossen und schickt den Abschluss zurück.
+const resetSkipConfirm = armConfirm(skipStationBtn, 'Station überspringen', 'Wirklich überspringen?', () => {
+    socket.emit('customAction', { type: 'sucherSkipRequest' });
+    closeHelpSheet(true);
+});
+
+// Alles zurücksetzen: wie der Hold-Button auf der Übersicht, nur hier als
+// Knopf mit Bestätigung statt langem Halten. Hier lokal sofort angewendet —
+// der Sender bekommt die eigene Rundfunk-Meldung sonst nicht zurück.
+const resetResetAllConfirm = armConfirm(resetAllBtn, 'Alles zurücksetzen', 'Wirklich zurücksetzen?', () => {
+    applyResetAll();
+    socket.emit('customAction', { type: 'sucherResetAll' });
+    closeHelpSheet(true);
+});
+
+/**
+ * Schaltet zwischen der weißen Warteansicht (Station läuft noch) und der
+ * Vollfarben-Ansicht (Station fertig, wartet aufs Zurückschütteln) um. Der
+ * Farbwechsel ist bewusst auffällig: Er holt den Blick vom großen Bildschirm
+ * zurück aufs Handy, wo jetzt die aktive Geste gefragt ist.
+ */
+function setStationFinished(finished) {
+    stationWait.classList.toggle('is-finished', finished);
+    stationWaitText.innerHTML = finished ? STATION_FINISHED_TEXT : STATION_WAIT_TEXT;
+    setChromeColor(finished ? ACCENT : '#ffffff');
 }
 
 // Fortschritt des Zurück-Schüttelns auf dem Handy. Er erscheint mit dem Schütteln
@@ -1171,9 +1392,11 @@ socket.on('sucherJoined', (data) => {
 
     if (state.phase === 'station') {
         mode = 'station';
+        returnShakeLocked = !!(STATIONEN[state.activeIndex] && STATIONEN[state.activeIndex].holdReturnShake);
         setStationWait(true);
     } else {
         mode = 'sucher';
+        returnShakeLocked = false;
         setStationWait(false);
     }
 });
@@ -1184,20 +1407,43 @@ socket.on('sucherJoined', (data) => {
 socket.on('customAction', (data) => {
     if (!data) return;
 
+    // Eine Station hat ein Schütteln gerade selbst verbraucht (Einführung o. Ä.
+    // geschlossen) — das soll nicht unbemerkt Richtung langem Rückkehr-Schütteln
+    // weiterzählen.
+    if (data.type === 'sucherResetReturnShake') {
+        returnShake.reset();
+        hideReturnProgress();
+        return;
+    }
+
     if (data.type === 'sucherPlaced' && grabbed) {
         // Das Bild ist auf der Collage abgelegt — vom Boden verschwindet es.
         // Weitergerückt wird erst, wenn die Station durchlaufen ist (sucherAdvance).
         grabbed.gone = true;
         grabbed = null;
-        disarm();
+        // Kein disarm() hier: Wer nach dem Ablegen einfach liegen bleibt, soll
+        // damit direkt in die Station halten können, statt den Zeiger erst
+        // wegbewegen und zurückführen zu müssen, um die Ruhe neu "scharf" zu
+        // machen — updateSteady() bleibt dafür in seinem jetzigen Zustand.
         return;
     }
 
     if (data.type === 'sucherEnter') {
         mode = 'station';
         returnShake.reset();
+        returnShakeLocked = !!(STATIONEN[data.index] && STATIONEN[data.index].holdReturnShake);
         setStationWait(true);
         hint.style.opacity = '0';
+        return;
+    }
+
+    // Der Laptop meldet den Abschluss, bevor überhaupt geschüttelt wurde —
+    // die Station dort läuft dabei ungestört weiter (es geht nur auf dem
+    // großen Bildschirm nicht mehr voran). Die Vollfarbe holt den Blick aufs
+    // Handy: hier geht es jetzt aktiv weiter.
+    if (data.type === 'sucherFinished' && mode === 'station') {
+        returnShakeLocked = false;
+        setStationFinished(true);
         return;
     }
 
@@ -1209,7 +1455,11 @@ socket.on('customAction', (data) => {
         return;
     }
 
-    if (data.type === 'sucherAdvance' && mode === 'station') {
+    // Kommt erst, nachdem die fertige Station aktiv weggeschüttelt wurde — zu
+    // dem Zeitpunkt hat das eigene Schütteln (returnToSucher) den Modus schon
+    // selbst auf 'sucher' gestellt. Deshalb hier kein mode === 'station' als
+    // Bedingung, sonst käme currentIndex nie mehr hoch.
+    if (data.type === 'sucherAdvance') {
         mode = 'sucher';
         setStationWait(false);
         lastFrame = 0;
@@ -1218,9 +1468,18 @@ socket.on('customAction', (data) => {
 
         // Die Station ist durch: das nächste Bild wird farbig und aufnehmbar.
         currentIndex += 1;
-        showHint(currentIndex < STATIONEN.length
-            ? 'Weiter suchen — das nächste Bild ist jetzt farbig'
-            : 'Geschafft — alle Bilder gesammelt', 4000);
+        if (currentIndex < STATIONEN.length) {
+            showHint('Weiter suchen — das nächste Bild ist jetzt farbig', 4000);
+        }
+        // Ist das die letzte Station, übernimmt updateAllDoneView() die Meldung.
+        return;
+    }
+
+    // Reset — ausgelöst entweder per Handhaltung auf der Übersicht oder über
+    // "Alles zurücksetzen" im Hilfe-Menü hier am Handy (dort bereits lokal
+    // angewendet, bevor dieses Event überhaupt verschickt wurde).
+    if (data.type === 'sucherResetAll') {
+        applyResetAll();
     }
 });
 
@@ -1247,6 +1506,9 @@ startBtn.addEventListener('click', async () => {
 
     startEl.style.display = 'none';
     started = true;
+    // Ab hier läuft der Lernraum — das Hilfe-Menü ist von jetzt an immer
+    // erreichbar, nicht erst während einer Station.
+    helpBtn.hidden = false;
     // Global anmelden (für die eingebettete Station, die sensorData/controllerStatus
     // global erwartet) und der Sucher-Sitzung beitreten (Pairing + Rehydrate).
     registerAsController();

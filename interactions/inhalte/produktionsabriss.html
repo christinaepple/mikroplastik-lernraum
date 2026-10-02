@@ -40,6 +40,13 @@
                Inhalts-Stationen. */
             --font-head: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
             --font-text: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+
+            /* Das eingescannte Papier als Fläche, wie im Sucher: ein
+               halbdeckender weißer Wasch nimmt ihm etwas Stärke, kein
+               zusätzliches Korn obenauf. */
+            --paper-bg:
+                linear-gradient(rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.38)),
+                url('/img/interactionen/textur.jpg') center center / cover no-repeat;
         }
 
         * {
@@ -51,6 +58,9 @@
         html,
         body {
             height: 100%;
+            /* Auch hier, falls html/body durch Rundung mal nicht exakt
+               deckungsgleich sind — sonst blitzt dort ein weißer Rand auf. */
+            background: var(--paper-bg);
         }
 
         /* Das Modul füllt das Fenster; ein begrenzender Rand um die Fläche
@@ -60,7 +70,6 @@
             font-family: var(--font-text);
             font-weight: 400;
             line-height: 1.5;
-            background-color: var(--bg-card);
             color: var(--text-main);
             display: flex;
             flex-direction: column;
@@ -597,7 +606,7 @@
             position: absolute;
             inset: 0;
             z-index: 30;
-            background: var(--bg-card);
+            background: var(--paper-bg);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -867,7 +876,7 @@
             position: absolute;
             inset: 0;
             z-index: 20;
-            background: var(--bg-card);
+            background: var(--paper-bg);
             transition: opacity 0.5s ease;
         }
 

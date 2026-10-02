@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quellen (Inhalte) - Labor</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inclusive+Sans:wght@300..700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="/css/interaktion.css">
+
+    <style>
+        :root {
+            --bg-card: #ffffff;
+            --border-card: #e2e8f0;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+
+            --font-head: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            --font-text: 'Inclusive Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            font-family: var(--font-text);
+            font-weight: 400;
+            line-height: 1.5;
+            background-color: var(--bg-card);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── Schließen ─────────────────────────────────────────────── */
+        .close-btn {
+            position: fixed;
+            top: 14px;
+            right: 16px;
+            z-index: 1;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 1.5px solid var(--text-main);
+            color: var(--text-main);
+            font-family: var(--font-text);
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        /* ── Lesefläche ─────────────────────────────────────────────── */
+        .scroll {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+        }
+
+        .wrap {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 40px 28px 64px;
+        }
+
+        .lead {
+            font-family: var(--font-head);
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 28px;
+        }
+
+        #quellenListe {
+            list-style: none;
+        }
+
+        /* Hängende Nummer: die Zahl steht links, der Eintrag rückt ein –
+           so lässt sich [n] mit einem Blick abzählen. */
+        .q-item {
+            display: grid;
+            grid-template-columns: 3.2em 1fr;
+            gap: 4px 8px;
+            padding: 16px 0;
+            border-top: 1px solid var(--border-card);
+        }
+
+        .q-item:first-child {
+            border-top: none;
+        }
+
+        .q-nr {
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .q-text {
+            text-wrap: pretty;
+        }
+
+        .q-link {
+            display: inline-block;
+            margin-top: 4px;
+            color: var(--accent);
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-decoration: none;
+            word-break: break-word;
+        }
+
+        .q-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Sprungziel aus einer Station: kurz hervorheben, wenn per #quelle-n
+           angesteuert. */
+        .q-item:target {
+            background: rgba(var(--accent-rgb), 0.08);
+            border-radius: 10px;
+            padding-left: 10px;
+            margin-left: -10px;
+        }
+    </style>
+</head>
+
+<body>
+    <a href="/inhalte.html" class="close-btn" aria-label="Schließen">✕</a>
+
+    <div class="scroll">
+        <div class="wrap">
+            <p class="lead">Quellen</p>
+            <ul id="quellenListe"></ul>
+        </div>
+    </div>
+
+    <script type="module" src="/js/interactions/inhalte/quellenverzeichnis.js"></script>
+</body>
+
+</html>

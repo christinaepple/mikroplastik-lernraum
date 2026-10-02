@@ -32,8 +32,6 @@ const buckets = {
 const scoreBoard = byId('scoreBoard');
 const bucketsContainer = byId('bucketsContainer');
 const flash = byId('flash');
-const idleOverlay = byId('idleOverlay');
-const idleText = byId('idleText');
 const introLayer = byId('introLayer');
 const introMain = byId('introMain');
 const areasNote = byId('areasNote');
@@ -42,22 +40,6 @@ const introCols = {
     middle: byId('introMiddle'),
     right: byId('introRight')
 };
-
-// ── Hinweis bei Inaktivität ────────────────────────────────────────────────
-// Nur für den Fall, dass jemand nicht weiterweiß: Er erscheint erst, wenn
-// eine Weile weder Bewegung noch Schütteln ankommt, und verschwindet mit der
-// ersten Bewegung wieder. Wer den Ablauf kennt, bekommt ihn nie zu sehen.
-const IDLE_DELAY = 8000;
-// Grad, ab denen eine Lageänderung als Bewegung zählt. Der Sensorstrom läuft
-// auch beim ruhig gehaltenen Gerät weiter, die Ereignisse allein sagen also
-// nichts; das Rauschen liegt deutlich unter dieser Schwelle.
-const IDLE_MOTION = 4;
-
-const IDLE_START = 'Schüttle das Gerät, um das Spiel zu starten.';
-
-let idleTimer = null;
-let idleMessage = null; // null = in dieser Phase gibt es keinen Hinweis
-let lastAngles = null;
 
 // Bilder — der Dateiname bestimmt, in welchen Bereich das Bild gehört.
 // Jedes Objekt kommt genau einmal vor.
@@ -181,8 +163,6 @@ socket.on('sensorData', (data) => {
     if (calibration.isActive()) return;
 
     const gamma = data.gamma !== null ? data.gamma : 0;
-    const beta = data.beta !== null ? data.beta : 90;
-    noteMotion(beta, gamma);
 
     evaluateSelection(gammaBase.delta(gamma));
 });
@@ -194,8 +174,6 @@ socket.on('sensorData', (data) => {
 // die es mitzählt, solange eine Station geöffnet ist, und dann zu sich
 // zurückholt.
 socket.on('shake', () => {
-    resetIdle();
-
     // Während der Kalibrierung ist Schütteln das Gegenteil dessen, was zählt.
     if (calibration.isActive()) return;
 
@@ -404,43 +382,6 @@ workspace.addEventListener('click', () => {
     if (areasVisible) startGame(); else showAreas();
 });
 
-// Ab jetzt kann ein Hinweis fällig werden; die Uhr läuft neu.
-function armIdleHint(message) {
-    idleMessage = message;
-    resetIdle();
-}
-
-// In dieser Phase gibt es keinen Hinweis (Einführungstext, laufendes Spiel).
-function disarmIdleHint() {
-    idleMessage = null;
-    clearTimeout(idleTimer);
-    idleOverlay.classList.remove('visible');
-}
-
-// Jede Bewegung blendet den Hinweis wieder aus und stellt die Uhr zurück.
-function resetIdle() {
-    idleOverlay.classList.remove('visible');
-    clearTimeout(idleTimer);
-    if (!idleMessage) return;
-
-    idleTimer = setTimeout(() => {
-        idleText.textContent = idleMessage;
-        idleOverlay.classList.add('visible');
-    }, IDLE_DELAY);
-}
-
-// Bewegung heißt Lageänderung, nicht eingehendes Ereignis.
-function noteMotion(beta, gamma) {
-    if (lastAngles
-        && Math.abs(beta - lastAngles.beta) < IDLE_MOTION
-        && Math.abs(gamma - lastAngles.gamma) < IDLE_MOTION) {
-        return;
-    }
-
-    lastAngles = { beta, gamma };
-    resetIdle();
-}
-
 // Die Bereiche mit ihren Begriffen einblenden, der Einführungstext geht weg;
 // ab jetzt wählt das Neigen zur Seite eine Kategorie aus und die Erklärung
 // erscheint darüber. Das nächste Schütteln startet das Spiel.
@@ -450,7 +391,6 @@ function showAreas() {
     areasNote.classList.remove('is-visible');
     introMain.classList.add('hidden');
     bucketsContainer.classList.add('visible');
-    armIdleHint(IDLE_START);
     updatePlayerPosition();
 }
 
@@ -461,7 +401,6 @@ function showIntroText() {
     if (!isTutorialActive) introMain.classList.remove('hidden');
     bucketsContainer.classList.remove('visible');
     advanceShake.reset();
-    disarmIdleHint();
     Object.values(introCols).forEach(col => col.classList.remove('active'));
 }
 
@@ -516,8 +455,6 @@ function startGame() {
     areasNote.classList.remove('is-visible');
     playerItem.classList.remove('hidden');
     scoreBoard.classList.remove('hidden');
-
-    disarmIdleHint();
 
     queue = shuffle(ITEMS);
     spawnItem();
