@@ -174,9 +174,15 @@ function updateFuture(rotation) {
     const years = share * (FUTURE_YEAR - lastYear);
     const value = lastValue * Math.pow(1 + GROWTH_RATE, years);
 
-    futureValue.textContent = `${Math.round(value).toLocaleString('de-DE')} Mio t`;
-    futureYear.textContent = String(Math.round(lastYear + years));
+    // Nur schreiben, wenn sich der Text ändert – der Sensor liefert deutlich
+    // öfter, als sich die Zahlen ändern.
+    const valueText = `${Math.round(value).toLocaleString('de-DE')} Mio t`;
+    const yearText = String(Math.round(lastYear + years));
+    if (valueText !== futureValueText) { futureValueText = valueText; futureValue.textContent = valueText; }
+    if (yearText !== futureYearText) { futureYearText = yearText; futureYear.textContent = yearText; }
 }
+let futureValueText = '';
+let futureYearText = '';
 
 placeBars();
 updateFuture(0);

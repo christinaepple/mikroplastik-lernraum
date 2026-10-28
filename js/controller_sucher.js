@@ -375,7 +375,11 @@ let currentIndex = 0;
 
 // Nur das nächste offene Bild (currentIndex) ist farbig und aufnehmbar; die
 // übrigen liegen schwarzweiß und fest, bis sie an der Reihe sind.
-const FREE_ORDER = false;
+// Nur lokal (Testen, Abfilmen): jedes Bild frei aufnehmbar, ohne Reihenfolge.
+// Der Server meldet das beim Beitritt (SUCHER_FREE_ORDER=1) — das Handy läuft
+// über die IP des Rechners, ein Host-Vergleich im Browser griffe dort nie.
+let FREE_ORDER = false;
+const doneIdx = new Set();   // FREE_ORDER: bereits abgeschlossene Stationen
 
 const particles = [];
 let grabbed = null;      // aufgenommenes Bild
@@ -644,7 +648,8 @@ let lastFrame = 0;
 // die Collage auf dem großen Bildschirm).
 let allDoneVisible = false;
 function updateAllDoneView() {
-    const done = mode === 'sucher' && currentIndex >= STATIONEN.length;
+    const done = mode === 'sucher'
+        && (FREE_ORDER ? doneIdx.size >= STATIONEN.length : currentIndex >= STATIONEN.length);
     if (done === allDoneVisible) return;
     allDoneVisible = done;
     allDone.hidden = !done;
@@ -1169,6 +1174,7 @@ function setStationWait(show) {
  */
 function applyResetAll() {
     currentIndex = 0;
+    doneIdx.clear();
     for (const pt of particles) pt.gone = false;
     grabbed = null;
     resetGrabHold();
@@ -1381,7 +1387,10 @@ socket.on('sucherJoined', (data) => {
     const state = data && data.state;
     if (!state) return;
 
+    FREE_ORDER = !!data.freeOrder;
     currentIndex = state.currentIndex;
+    doneIdx.clear();
+    for (const p of state.placed) if (p.done) doneIdx.add(p.index);
     const goneSet = new Set(state.placed.map((p) => p.index));
     for (const pt of particles) pt.gone = goneSet.has(pt.index);
 
@@ -1468,7 +1477,10 @@ socket.on('customAction', (data) => {
 
         // Die Station ist durch: das nächste Bild wird farbig und aufnehmbar.
         currentIndex += 1;
-        if (currentIndex < STATIONEN.length) {
+        if (FREE_ORDER) {
+            doneIdx.add(data.index);
+            if (doneIdx.size < STATIONEN.length) showHint('Weiter suchen — jedes Bild ist aufnehmbar', 4000);
+        } else if (currentIndex < STATIONEN.length) {
             showHint('Weiter suchen — das nächste Bild ist jetzt farbig', 4000);
         }
         // Ist das die letzte Station, übernimmt updateAllDoneView() die Meldung.

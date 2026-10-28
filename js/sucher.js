@@ -45,8 +45,6 @@ function setCursorHand(carrying) {
 }
 const carriedEl = byId('carried');
 const hintEl = byId('hint');
-const resetBtn = byId('resetBtn');
-const resetBtnFill = byId('resetBtnFill');
 
 const DEFAULT_HINT = 'halte deine hand auf ein bild, um die lernstation zu starten';
 
@@ -114,9 +112,6 @@ const MAGNET_SIZE_FACTOR = 0.75;
 // schwergängig und ruhig (Zittern wird geschluckt), groß = direkt und flink.
 const CURSOR_SMOOTHING = 0.03;
 
-// Reset-Button: deutlich länger als das Ablegen/Betreten — ein versehentliches
-// Zurücksetzen soll praktisch ausgeschlossen sein.
-const RESET_HOLD_MS = 4200;
 // ====================================================================
 
 // Letzte Meldung des Handys.
@@ -132,7 +127,6 @@ let activeWasDone = false; // war diese Station beim Betreten schon abgeschlosse
 let stationCompleted = false;
 let enterPause = false;   // Übergang ins Betreten läuft — tick ruht so lange
 let lockUntil = 0;        // Sperrfrist nach einer ausgelösten Aktion
-let resetDwellStart = 0;  // eigener, langsamerer Haltefortschritt für den Reset-Button
 
 // Die abgelegten Bilder: { el, index, done }
 const pieces = [];
@@ -173,7 +167,6 @@ function setConnected(connected) {
     // Während einer Station regelt deren Rahmen die Sichtbarkeit, nicht dies.
     if (!busy) {
         sheet.hidden = !connected;
-        resetBtn.hidden = !connected;
     }
 }
 
@@ -245,7 +238,6 @@ function rehydrate(state) {
     enterPause = false;
     if (!station.hidden) { clearModuleFrame(station); station.hidden = true; }
     sheet.hidden = !hasController;
-    resetBtn.hidden = !hasController;
 }
 
 // ─────────────────────────────────────────────
@@ -262,9 +254,8 @@ socket.on('customAction', (data) => {
     // ab, ohne auf die Abschluss-Geste zu warten.
     if (data.type === 'sucherSkipRequest') { skipStation(); return; }
 
-    // "Alles zurücksetzen" — ausgelöst entweder hier per Handhaltung
-    // (resetEverything, das meldet sich nicht selbst zurück) oder vom Hilfe-
-    // Menü am Handy (das hat seinen eigenen Stand schon angewendet).
+    // "Alles zurücksetzen" aus dem Hilfe-Menü am Handy (das hat seinen
+    // eigenen Stand schon angewendet).
     if (data.type === 'sucherResetAll') { applyResetAll(); return; }
 
     if (data.type !== 'sucherAim') return;
@@ -456,7 +447,6 @@ function enterStation(piece) {
     busy = true;
     activePiece = piece;
     activeWasDone = piece.done;
-    resetBtn.hidden = true;
     // tick ruht bis der Rahmen steht, damit der Blend (die volle Skizze) nicht
     // vorzeitig geräumt wird und das Foto zurückschnappt.
     enterPause = true;
@@ -496,7 +486,6 @@ function enterStation(piece) {
  */
 function leaveStation() {
     sheet.hidden = false;
-    resetBtn.hidden = !hasController;
     // Eigene, langsamere Transition nur fürs Verlassen — das Einblenden beim
     // Betreten bleibt beim kürzeren Takt aus der CSS-Regel.
     station.style.transition = `opacity ${STATION_FADE_MS}ms ease`;
@@ -571,15 +560,6 @@ function applyResetAll() {
     setHint(hasController ? DEFAULT_HINT : '');
 }
 
-/**
- * Reset-Button oben rechts: die gesamte Collage verschwindet, der Ablauf
- * beginnt von vorn — auf dem Handy liegen danach wieder alle Bilder am Boden.
- */
-function resetEverything() {
-    applyResetAll();
-    socket.emit('customAction', { type: 'sucherResetAll' });
-}
-
 onCompletion((detail, source) => {
     if (!activePiece || source !== station.contentWindow) return;
 
@@ -650,38 +630,12 @@ function tick() {
         curY += (rawY - curY) * CURSOR_SMOOTHING;
     }
 
-    // Reset-Button: ein eigener, bewusst langsamer Hold, unabhängig vom
-    // Ablegen/Betreten — löst nur aus, wenn der Zeiger wirklich darüber ruht.
-    const resetRect = resetBtn.hidden ? null : resetBtn.getBoundingClientRect();
-    const overReset = !carrying && !!resetRect
-        && curX >= resetRect.left && curX <= resetRect.right
-        && curY >= resetRect.top && curY <= resetRect.bottom;
-
-    if (overReset && aim.steady && now >= lockUntil) {
-        if (resetDwellStart === 0) resetDwellStart = now;
-        const resetProgress = Math.min((now - resetDwellStart) / RESET_HOLD_MS, 1);
-        resetBtnFill.style.width = (resetProgress * 100) + '%';
-        resetBtn.classList.add('is-active');
-        if (resetProgress >= 1) {
-            resetDwellStart = 0;
-            resetBtnFill.style.width = '0%';
-            resetBtn.classList.remove('is-active');
-            lockUntil = now + ACTION_LOCK_MS;
-            resetEverything();
-            return;
-        }
-    } else if (resetDwellStart !== 0 || resetBtn.classList.contains('is-active')) {
-        resetDwellStart = 0;
-        resetBtnFill.style.width = '0%';
-        resetBtn.classList.remove('is-active');
-    }
-
     // Ohne Traglast bestimmt der Magnet nur, welches Bild anvisiert ist — der Zug
     // auf dessen Mitte läuft erst parallel zur Überblendung (weiter unten), nicht
     // schon beim bloßen Annähern.
     let target = null;
     let hit = null;
-    if (!carrying && !overReset) {
+    if (!carrying) {
         hit = nearestPiece(curX, curY);
         target = hit ? hit.piece : null;
     }

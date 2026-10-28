@@ -128,6 +128,8 @@ const activeControllers = new Set();
 // `sensorData`/`shake` bleiben global, weil die eingebettete Station sie über
 // ihre eigene Verbindung global erwartet.
 const sucherSessions = new Map();
+// Nur lokal zum Testen/Abfilmen: SUCHER_FREE_ORDER=1 npm start — jedes Bild frei aufnehmbar.
+const SUCHER_FREE_ORDER = process.env.SUCHER_FREE_ORDER === '1';
 const SUCHER_TTL_MS = 30 * 60 * 1000;   // verwaiste Sitzung nach 30 min verwerfen
 
 function newSucherState() {
@@ -266,7 +268,7 @@ io.on('connection', (socket) => {
         socket.sucherId = id;
         socket.sucherRole = role;
         socket.join(sucherRoom(id));
-        socket.emit('sucherJoined', { id, role, state: publicState(s) });
+        socket.emit('sucherJoined', { id, role, state: publicState(s), freeOrder: SUCHER_FREE_ORDER });
         emitSucherStatus(id);
     }
 
